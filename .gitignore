@@ -1,0 +1,4 @@
+outputs/
+__marimo__
+.env
+.DS_Store/

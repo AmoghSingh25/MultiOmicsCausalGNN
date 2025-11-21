@@ -1,0 +1,116 @@
+# Process
+# Read data in DFs for omics
+# Run causal discovery if chosen
+# Create the graph of omics to connect the omics together - Initially use networkx graphs and then move to manually imbibing links from CD and PPIs - Speed up creation of the graph using sets or pre-storing
+# Run training of the CausalGNN on the graph
+# Pathway analysis on average and per sample if required
+# Perform interventions on the learnt graph
+
+from train_causalGNN import _trainGNN
+from generate_graph import _generate_pyg
+import polars as pl
+from analysis import _pathway_analysis, _intervention_analysis
+import os
+import copy
+from generate_pathways import _generate_base_network
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
+
+def _create_dirs(cfg):
+    parent_dir = os.path.dirname(os.path.realpath(__file__))
+    exp_name = cfg.get("name", "experiment")
+    dirs = [
+        os.path.join(parent_dir, cfg.output.save_dir),
+        os.path.join(parent_dir, cfg.output.save_dir, "logs"),
+        os.path.join(parent_dir, cfg.output.save_dir, exp_name),
+        os.path.join(parent_dir, cfg.output.save_dir, exp_name, "network"),
+        os.path.join(parent_dir, cfg.output.save_dir, exp_name, "weights"),
+        os.path.join(parent_dir, cfg.output.save_dir, exp_name, "figures"),
+    ]
+    for i in dirs:
+        if not os.path.exists(i):
+            os.mkdir(i)
+    return os.path.join(parent_dir, cfg.output.save_dir, exp_name)
+
+
+@hydra.main(version_base=None, config_path="configs", config_name="base")
+def main(cfg: DictConfig):
+    print("Configuration - ")
+    print(OmegaConf.to_yaml(cfg))
+    output_dir = _create_dirs(cfg)
+    rna_df = pl.read_csv(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), cfg.data.rna_data),
+        null_values=["NA"],
+    )
+    metab_df = pl.read_csv(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), cfg.data.metab_data),
+        null_values=["NA"],
+    )
+    prot_df = pl.read_csv(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), cfg.data.prot_data),
+        null_values=["NA"],
+    )
+    _generate_base_network(
+        rna_df,
+        predefined_network=cfg.data.predefined_network,
+        graph_name=cfg.data.get("base_network_file", "human_base_network.graphml"),
+        output_dir=output_dir,
+        data_dir=cfg.data.dir,
+        use_ppi=cfg.data.use_ppi_network,
+        org_name=cfg.data.org_name,
+        significant_ppi=cfg.data.significant_ppi,
+    )
+
+    print("\tCreating graph...")
+    pyg = _generate_pyg(
+        rna_data=rna_df,
+        prot_data=prot_df,
+        metab_data=metab_df,
+        predefined_network=cfg.data.predefined_network,
+        output_dir=output_dir,
+        graph_name=cfg.data.get("base_network_file", "human_base_network.graphml"),
+        train_test_ratio=cfg.model.train_test_ratio,
+        use_causal_edges=cfg.data.use_causal_edges,
+    )
+
+    print("Starting GNN training...")
+    pyg_copy = copy.deepcopy(pyg)
+    _trainGNN(
+        pyg,
+        epochs=cfg.model.epochs,
+        weight_path=cfg.model.save_file,
+        save_dir=output_dir,
+        config=OmegaConf.to_container(cfg=cfg, resolve=True),
+    )
+
+    if cfg.perform_intervention:
+        metabs = list(metab_df.columns)[1:]
+        prots_l = list(prot_df.columns)[1:]
+        rna_l = list(rna_df.columns)[1:]
+        parent_dir = os.path.dirname(os.path.realpath(__file__))
+        weight_path = os.path.join(
+            parent_dir, output_dir, "weights", cfg.model.save_file
+        )
+        _pathway_analysis(
+            pyg_copy,
+            weight_path=weight_path,
+            metabs=metabs,
+            sample_id=cfg.intervention.sample,
+            output_dir=output_dir,
+        )
+        _intervention_analysis(
+            pyg,
+            cfg.intervention.pathway,
+            cfg.intervention.sample,
+            cfg.intervention.sample,
+            prots_l,
+            rna_l,
+            metabs_l=metabs,
+            weight_path=weight_path,
+            output_dir=output_dir,
+        )
+
+
+if __name__ == "__main__":
+    main()

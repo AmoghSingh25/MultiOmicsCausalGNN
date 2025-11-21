@@ -1,0 +1,26 @@
+---
+defaults:
+  - /base
+  - _self_
+name: glioblastoma_omics
+model:
+  save_file: saved_weights2.pt
+data:
+  predefined_network: true
+  use_causal_edges: true
+  significant_ppi: false
+  rna_data: Data/input_data/KidneyTumorData/frmt_transcriptomics.csv
+  metab_data: Data/input_data/KidneyTumorData/frmt_metabolomics.csv
+  prot_data: Data/input_data/KidneyTumorData/frmt_proteomics.csv
+  base_network_file: human_base_network_2.graphml
+causal:
+  method: fci
+  filt_rna: Data/input_data/gene_expression_filt_edges.pkl
+  filt_prot: Data/input_data/proteomics_filt_edges.pkl
+  alpha: 0.1
+  llm:
+    objective: orient
+    model_id: meta-llama-3.1-8b-instruct
+    temperature: 0.7
+    rag: true
+perform_intervention: false
