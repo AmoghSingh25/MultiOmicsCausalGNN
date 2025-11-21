@@ -4,7 +4,7 @@ Use RStudio to download the EnrichmentBrowser package and download the KEGG path
 
 ```
 library("EnrichmentBrowser")
-sarpathway <- downloadPathways("hsa", out.dir="GNN-Causal/Data/HumanPathways", cache=FALSE)
+sarpathway <- downloadPathways("hsa", out.dir="Data/HumanPathways", cache=FALSE)
 ```
 
 Requires Pathway files and PPI network files for generation of the graph links (RNA-Protein-Metabolite-Pathway).

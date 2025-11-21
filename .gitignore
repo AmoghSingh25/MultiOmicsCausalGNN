@@ -1,4 +1,8 @@
 outputs/
 __marimo__
 .env
-.DS_Store/
+.DS_Store
+Data/HumanPathways/
+Data/ppi_files/
+__pycache__/
+output/
