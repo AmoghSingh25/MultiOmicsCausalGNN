@@ -50,18 +50,9 @@ class MultiLayerHetero(torch.nn.Module):
         self.lin2 = HeteroDictLinear(
             in_channels=64, out_channels=inp_dim, types=["protein", "metabolite"]
         )
-        # self.upd_edge_weight = ModuleDict()
-        # for e_type in data.edge_types:
-        #     self.upd_edge_weight[e_type] = Linear(1,1, bias=False)
 
     def forward(self, data, edge_dict):
-        # Update edge weight before passing data
-        # updated_edge_weight_dict = data.edge_weight_dict
-        # for e_type in data.edge_types:
-        #     updated_edge_weight_dict[e_type] = self.upd_edge_weight[e_type](data.edge_weight_dict[e_type].detach())
-
-        # data.edge_weight_dict = updated_edge_weight_dict
-
+        
         x_dict = self.lin1(data)
         x_dict = {k: self.drop1(self.norm1(v.relu())) for k, v in x_dict.items()}
 
@@ -73,9 +64,6 @@ class MultiLayerHetero(torch.nn.Module):
 
         x_dict = self.conv3(x_dict, edge_dict)
         x_dict = {k: self.norm4(v).relu() for k, v in x_dict.items()}
-
-        # x_dict = self.conv4(x_dict, edge_dict)
-        # x_dict = {k: self.norm5(v).relu() for k, v in x_dict.items()}
 
         x_dict = self.lin2(x_dict)
         x_dict = {k: F.softplus(v) for k, v in x_dict.items()}

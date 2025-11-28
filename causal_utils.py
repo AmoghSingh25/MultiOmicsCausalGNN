@@ -15,8 +15,6 @@ def run_fci(input_data, cache_path=None, indep_test="gsq", bg=None, **kwargs):
         background_knowledge=bg,
         alpha=kwargs["alpha"],
     )
-    print(edges)
-    print(g[0].graph > 0)
     return g, labels
 
 
@@ -46,13 +44,6 @@ def run_cdnod(input_data, c_idx=1, **kwargs):
 def run_ges(input_data, **kwargs):
     labels = [f"{col}" for i, col in enumerate(input_data.columns)]
     data = input_data.to_numpy()
-    Record = ges(data, alpha=kwargs["alpha"])
+    Record = ges(data)
 
     return Record["G"], labels
-
-
-# def remove_duplicate_edges(filename):
-#     g = nx.read_graphml("Data/" + filename)
-#     g_temp = nx.Graph(g)
-#     print("Duplicate edges = ", len(g.edges()) - len(g_temp.edges()))
-#     nx.write_graphml(g_temp, "Data/savedNetworks/" + filename)

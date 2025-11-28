@@ -1,0 +1,12 @@
+# @package _global_
+defaults:
+  - ./rcc@_global_
+  - _self_
+name: rcc_bn2
+description: Significant PPI
+data:
+  predefined_network: false
+  use_causal_edges: false
+  significant_ppi: true
+  use_ppi_network: true
+perform_intervention: false

@@ -1,25 +1,36 @@
----
+# @package _global_
 defaults:
-  - /main
-  - _self_
-name: glioblastoma_omics
+  - ../main@_global_
+name: rcc
 model:
-  save_file: saved_weights2.pt
+  epochs: 1000
+  train_test_ratio: 0.7
+  save_file: saved_weights.pt
+  runs: 5
+  prot_loss: 0.6
+  metab_loss : 0.4
+  seed:
+    - 2729424255
+    - 3683917037
+    - 2667104789
+    - 2821685283
+    - 4015210798
 data:
   predefined_network: false
   use_causal_edges: true
   significant_ppi: false
+  random_edges: false
   rna_data: Data/input_data/KidneyTumorData/frmt_transcriptomics.csv
   metab_data: Data/input_data/KidneyTumorData/frmt_metabolomics.csv
   prot_data: Data/input_data/KidneyTumorData/frmt_proteomics.csv
-  base_network_file: human_base_network_2.graphml
+  base_network_file: human_base_network.graphml
 causal:
   filt_rna: Data/input_data/KidneyTumorData/renal_cancer_gene_filt.txt
   filt_prot: Data/input_data/KidneyTumorData/renal_cancer_prot_filt.txt
-  alpha: 0.1
   llm:
-    objective: orient
+    objective: None
     model_id: meta-llama-3.1-8b-instruct
     temperature: 0.7
     rag: true
+    context: 100000
 perform_intervention: false

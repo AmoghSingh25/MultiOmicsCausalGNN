@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 def llm_prots_cd(prots, rag, entity_type="Protein"):
     prompt = f"""
-    From the given {entity_type}s, link them together in a way that you believe is the accurate causal relation between them and indicates a interaction according to you. Each {entity_type} is on a single line with a short description. Return a list of pairs, and each pair should be seperated by ';'. Each pair must contain of proteins only from the input list, seperated by a ','.
+    From the given {entity_type}s, link them together in a way that you believe is the accurate causal relation between them and indicates a interaction according to you. Each {entity_type} is on a single line with a short description. Return a list of pairs, and each pair should be seperated by ';'. Each pair must contain of exactly two {entity_type}s only from the input list, seperated by a ','.
         Do not provide any additional information apart from the answer in <output> tags.
         Assume any additional context and description of parameters. You asbolutely have to surround your answer in <output> tags like so.
         <output>
@@ -60,6 +60,8 @@ def orient_llm(edges, rag, entity_type="Protein", use_rag=True):
 def basic_output_process(resp):
     start_token = "<output>"
     end_token = "</output>"
+    if start_token not in resp or end_token not in resp:
+        return None
     resp = resp[resp.index(start_token) + len(start_token) : resp.index(end_token)]
     resp = resp.replace("\n", " ").split(";")
     return resp
@@ -67,6 +69,8 @@ def basic_output_process(resp):
 
 def process_check_output(resp, edges):
     options = basic_output_process(resp)
+    if options is None:
+        return options
     valid_edges = []
     for i in range(len(options)):
         options[i] = int(options[i].strip())

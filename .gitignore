@@ -6,3 +6,5 @@ Data/HumanPathways/
 Data/ppi_files/
 __pycache__/
 output/
+orig_data/
+multirun/

@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - ./rcc@_global_
+  - _self_
+name: rcc_bn9
+description: Causal links by Gemma
+data:
+  predefined_network: false
+  use_causal_edges: true
+  significant_ppi: false
+  use_ppi_network: false
+causal:
+  rna_method: llm
+  prot_method: llm
+  llm:
+    objective: None
+    model_id: meta-llama-3.1-8b-instruct
+    temperature: 0.7
+    rag: true
+perform_intervention: false

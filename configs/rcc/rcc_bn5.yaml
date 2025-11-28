@@ -1,0 +1,15 @@
+# @package _global_
+defaults:
+  - ./rcc@_global_
+  - _self_
+name: rcc_bn5
+description: Random links
+data:
+  predefined_network: false
+  use_causal_edges: false
+  significant_ppi: false
+  use_ppi_network: false
+  random_edges: true
+  n_random_edges_rna: 23
+  n_random_edges_prot: 35
+perform_intervention: false

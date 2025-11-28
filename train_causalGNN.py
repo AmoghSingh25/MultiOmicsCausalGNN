@@ -1,14 +1,11 @@
-## TO DO
-# Parameters for LR, Loss function, combined loss function or single omic loss function
-#
 import json
 import time
 import os
 import sys
-import copy
 import torch
 from MultiLayerHuman import MultiLayerHuman
 from tqdm import tqdm
+from torch_geometric import seed_everything
 
 
 def _trainGNN(pyg, **kwargs):
@@ -30,72 +27,124 @@ def _trainGNN(pyg, **kwargs):
     """
 
     device = torch.device("cpu")
+    n_runs = kwargs["config"]["model"]["runs"]
+    _timestamp = int(time.time())
+    global_min_loss = sys.maxsize
+    global_best_weight = None
 
-    model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
-    optim = torch.optim.Adam(model.parameters(), lr=0.01)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optim, mode="min", factor=0.01, patience=5, min_lr=1e-12
-    )
-    loss_fn = torch.nn.MSELoss()
-
-    pyg = pyg.to(device)
-    model = model.to(device)
-
-    print("\tModel validation result = ", pyg.validate())
-
-    best_model_weight = None
-    model.train()
-    losses = []
-    losses_val = []
-    lrs = []
-    min_val_loss = sys.maxsize
-    for _ in tqdm(range(kwargs["epochs"])):
-        optim.zero_grad()
-        out = model(pyg.x_dict, pyg.edge_index_dict)
-        loss1 = loss_fn(
-            out["metabolite"][:, pyg["metabolite"].train_mask],
-            pyg["metabolite"].y[:, pyg["metabolite"].train_mask],
+    for i in range(n_runs):
+        print("\tRun No. = ", i + 1)
+        seed_everything(kwargs['config']['model']['seed'][i])
+        model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
+        optim = torch.optim.Adam(model.parameters(), lr=0.01)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optim, mode="min", factor=0.01, patience=5, min_lr=1e-12
         )
-        loss_comb = loss1
-        loss_comb.backward()
-        optim.step()
-        scheduler.step(loss_comb)
+        loss_fn = torch.nn.MSELoss()
 
-        with torch.no_grad():
-            loss_1 = loss_fn(
-                out["metabolite"][:, pyg["metabolite"].test_mask],
-                pyg["metabolite"].y[:, pyg["metabolite"].test_mask],
+        pyg = pyg.to(device)
+        model = model.to(device)
+
+        print("\tModel validation result = ", pyg.validate())
+
+        best_model_weight = None
+        model.train()
+        losses_val = []
+        losses_val_prot = []
+        losses_val_metab = []
+
+        losses = []
+        losses_prot = []
+        losses_metab = []
+        lrs = []
+        min_val_loss = sys.maxsize
+
+        for _ in tqdm(range(kwargs["epochs"])):
+            optim.zero_grad()
+            out = model(pyg.x_dict, pyg.edge_index_dict)
+            loss1 = loss_fn(
+                out["metabolite"][:, pyg["metabolite"].train_mask],
+                pyg["metabolite"].y[:, pyg["metabolite"].train_mask],
+            )
+            loss2 = loss_fn(
+                out["protein"][:, pyg["protein"].train_mask],
+                pyg["protein"].y[:, pyg["protein"].train_mask],
+            )
+            loss_comb = (
+                kwargs["config"]["model"]["metab_loss"] * loss1
+                + kwargs["config"]["model"]["prot_loss"] * loss2
             )
 
-        if loss_comb < min_val_loss:
-            best_model_weight = copy.deepcopy(model.state_dict())
-            min_val_loss = loss_comb
-        losses.append(loss1.item())
-        lrs.append(scheduler.get_last_lr()[0])
-        losses_val.append(loss_1.item())
+            loss_comb.backward()
+            optim.step()
+            scheduler.step(loss_comb)
 
-    parent_dir = os.path.dirname(os.path.realpath(__file__))
+            with torch.no_grad():
+                loss1_val = loss_fn(
+                    out["metabolite"][:, pyg["metabolite"].test_mask],
+                    pyg["metabolite"].y[:, pyg["metabolite"].test_mask],
+                )
+                loss2_val = loss_fn(
+                    out["protein"][:, pyg["protein"].test_mask],
+                    pyg["protein"].y[:, pyg["protein"].test_mask],
+                )
+
+                loss_comb_val = (
+                    kwargs["config"]["model"]["metab_loss"] * loss1_val
+                    + kwargs["config"]["model"]["prot_loss"] * loss2_val
+                )
+
+            if loss_comb_val < min_val_loss:
+                best_model_weight = model.state_dict()
+                min_val_loss = loss_comb_val.item()
+
+            if loss_comb_val < global_min_loss:
+                global_best_weight = model.state_dict()
+                global_min_loss = loss_comb_val.item()
+
+            losses_metab.append(loss1.item())
+            losses_prot.append(loss2.item())
+            losses.append(loss_comb.item())
+
+            losses_val_metab.append(loss1_val.item())
+            losses_val_prot.append(loss2_val.item())
+            losses_val.append(loss_comb_val.item())
+
+            lrs.append(scheduler.get_last_lr()[0])
+
+        parent_dir = os.path.dirname(os.path.realpath(__file__))
+        abs_path = os.path.join(
+            parent_dir,
+            kwargs["save_dir"],
+            "weights",
+            "run_" + str(i + 1) + kwargs["weight_path"],
+        )
+        torch.save(best_model_weight, abs_path)
+        log_ = {
+            "loss_val": {
+                "prot": losses_val_prot,
+                "metab": losses_val_metab,
+                "comb": losses_val,
+            },
+            "loss_train": {"prot": losses_prot, "metab": losses_metab, "comb": losses},
+            "lrs":lrs,
+            "timestamp": _timestamp,
+            "config": kwargs["config"],
+            "name": time.time() if kwargs["config"]["name"] is None else kwargs["config"]["name"],
+        }
+
+        log_path = os.path.join(
+            parent_dir,
+            kwargs["config"]["output"]["save_dir"],
+            "logs",
+            str(_timestamp) + "_run_" + str(i) + ".json",
+        )
+        with open(log_path, "w") as f:
+            json.dump(log_, f)
+
+        print(f"\tTraining Completed. Saved logs at {log_path}")
     abs_path = os.path.join(
         parent_dir, kwargs["save_dir"], "weights", kwargs["weight_path"]
     )
-    torch.save(best_model_weight, abs_path)
-    _timestamp = int(time.time())
-    log_ = {
-        "loss_val": losses,
-        "loss_train": losses_val,
-        "timestamp": _timestamp,
-        "config": kwargs["config"],
-        "name": time.time()
-        if kwargs["config"]["name"] is None
-        else kwargs["config"]["name"],
-    }
-    log_path = os.path.join(
-        parent_dir,
-        kwargs["config"]["output"]["save_dir"],
-        "logs",
-        str(_timestamp) + ".json",
-    )
-    with open(log_path, "w") as f:
-        json.dump(log_, f)
-
-    print(f"\tTraining Completed. Saved logs at {log_path}")
+    print("Saving global weight at ", abs_path)
+    torch.save(global_best_weight, abs_path)

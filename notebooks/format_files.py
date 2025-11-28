@@ -1,12 +1,13 @@
 import marimo
 
-__generated_with = "0.17.8"
+__generated_with = "0.18.0"
 app = marimo.App(width="medium")
 
 
 @app.cell
 def _():
     import polars as pl
+
     return (pl,)
 
 
@@ -68,9 +69,13 @@ def _(pl):
 
 
 @app.cell
-def _(pl):
-    _prot_df = pl.read_csv("Data/input_data/KidneyTumorData/proteomics.csv")
-    _prot_df.head()
+def _(common_ids, pl):
+    _t = pl.read_excel(
+        "/Users/amogh/Downloads/mmc2.xlsx", sheet_name="clinical_characteristics"
+    )
+    _t = _t.select(["caseID", "tumorClass"])
+    _t = _t.filter(pl.col("caseID").is_in(common_ids))
+    _t
     return
 
 
@@ -103,6 +108,11 @@ def _(common_ids, pl):
     _prot_df = _prot_df.slice(1)
     print(_prot_df.shape)
     _prot_df.write_csv("Data/input_data/KidneyTumorData/frmt_proteomics.csv")
+    return
+
+
+@app.cell
+def _():
     return
 
 

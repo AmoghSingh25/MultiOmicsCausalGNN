@@ -1,0 +1,22 @@
+# @package _global_
+defaults:
+  - ./rcc@_global_
+  - _self_
+name: rcc_bn8
+description: Causal links by Llama
+data:
+  predefined_network: false
+  use_causal_edges: true
+  significant_ppi: false
+  use_ppi_network: false
+causal:
+  filt_rna: Data/input_data/KidneyTumorData/transcriptomics_filt_edges.txt
+  filt_prot: Data/input_data/KidneyTumorData/proteomics_filt_edges.txt
+  rna_method: llm
+  prot_method: llm
+  llm:
+    objective: None
+    model_id: meta-llama-3.1-8b-instruct
+    temperature: 0.7
+    rag: true
+perform_intervention: false

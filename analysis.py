@@ -12,12 +12,12 @@ warnings.filterwarnings("ignore")
 
 
 def get_top_pathways(p_s, p_n):
-    list1, list2 = zip(*sorted(zip(p_s, p_n), reverse=True))
-    return list1, list2
+    s, n = zip(*sorted(zip(p_s, p_n), reverse=False))
+    return list(s), list(n)
 
 
-def get_pathway_mean_sum(samp_id, model, pyg, metabs):
-    # samp_id = samp_target
+def get_pathway_mean_sum(metab_vals, metabs):
+
     abs_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Data")
 
     metab_pathways = _read_file(os.path.join(abs_path, "human_metab_pathway_t.pkl"))
@@ -31,72 +31,62 @@ def get_pathway_mean_sum(samp_id, model, pyg, metabs):
             else:
                 rev_metab_pathway[j] = [i]
 
-    with torch.no_grad():
-        out = model(pyg.x_dict, pyg.edge_index_dict)
+    metab_vals = torch.log(
+        metab_vals
+    )  # Log transformation before computing pathway scores
 
     metab_pathways_l = set()
     for i in metab_pathways.values():
         metab_pathways_l.update(i)
     metab_pathways_l = {k: {"vals": []} for k in metab_pathways_l}
 
-    for i in range(len(out["metabolite"][:, samp_id])):
+    for i in range(len(metab_vals)):
         metab_name = metabs[i]
         if metab_pathways.get(metab_name) is None:
             continue
         for j in metab_pathways[metab_name]:
-            metab_pathways_l[j]["vals"].append(out["metabolite"][:, samp_id][i].item())
+            metab_pathways_l[j]["vals"].append(metab_vals[i].item())
     pathway_names = []
-    # pathway_norm_sums = []
-    pathway_sums = []
-    pathway_means = []
+    activity_scores = []
 
     for i in metab_pathways_l:
         val_i = np.array(metab_pathways_l[i]["vals"])
-        metab_pathways_l[i]["mean"] = np.mean(val_i)
-        metab_pathways_l[i]["sum"] = np.sum(val_i)
-        val_i = np.abs(val_i)
-        metab_pathways_l[i]["abs_mean"] = np.mean(val_i)
-        metab_pathways_l[i]["abs_sum"] = np.sum(val_i)
-        pathway_sums.append(np.sum(val_i))
-        pathway_means.append(np.sum(val_i) / len(rev_metab_pathway[i]))
+        k = val_i.shape[0]
+        N = len(rev_metab_pathway[i])
+        metab_pathways_l[i]["activity_score"] = np.sum(val_i) / (k / N)
+        activity_scores.append(metab_pathways_l[i]["activity_score"])
         pathway_names.append(i)
-    pathway_sums = np.nan_to_num(np.array(pathway_sums), 0)
-    pathway_means = np.nan_to_num(np.array(pathway_means), 0)
-    # pathway_sum_norm = normalize(np.array(pathway_sums).reshape(-1,1),axis=0).reshape(-1)
-    # pathway_means_norm = normalize(np.array(pathway_means).reshape(-1,1),axis=0).reshape(-1)
-    ## Pathway score - sum
-    l1, l2 = get_top_pathways(pathway_sums, pathway_names)
-    ## Pathway score - mean
-    l3, l4 = get_top_pathways(pathway_means, pathway_names)
-    return l1, l2, l3, l4
+
+    activity_scores = np.nan_to_num(np.array(activity_scores))
+
+    ## Activity scores
+    scores, names = get_top_pathways(activity_scores, pathway_names)
+
+    comp_vals = [-scores[names.index(i)] for i in names]
+
+    return comp_vals, names
 
 
 def _pathway_analysis(pyg, weight_path, metabs, sample_id, output_dir):
     print("Performing pathway analysis...")
     device = torch.device("cpu")
     model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
+
     model.load_state_dict(torch.load(weight_path, weights_only=True))
     model.eval()
+    with torch.no_grad():
+        out = model(pyg.x_dict, pyg.edge_index_dict)
 
-    l1, l2, l3, l4 = get_pathway_mean_sum(sample_id, model, pyg, metabs)
+    comp_vals, names = get_pathway_mean_sum(out["metabolite"][:, sample_id], metabs)
+
     abs_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), output_dir, "figures"
     )
-    comp_vals_sum = [l1[l2.index(i)] for i in l2]
-    comp_vals_avg = [l3[l4.index(i)] for i in l4]
 
     if not os.path.exists(abs_path):
         os.makedirs(abs_path)
     print("\tPathway analysis graphs saved to ", abs_path)
-    _save_pathway_fig(
-        l2, comp_vals_sum, os.path.join(abs_path, "sum_pathway_fig.png"), title="total"
-    )
-    _save_pathway_fig(
-        l4,
-        comp_vals_avg,
-        os.path.join(abs_path, "avg_pathway_fig.png"),
-        title="normalized",
-    )
+    _save_pathway_fig(names, comp_vals, os.path.join(abs_path, "activity_scores.png"))
 
 
 def _intervention_analysis(
@@ -114,11 +104,7 @@ def _intervention_analysis(
     metab_pathway = set()
     abs_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Data")
 
-    # Selecting different sample to simulate intervention
-    target_sample = intervention_sample + 1
-    if target_sample > pyg["protein"]["x"].shape[1]:
-        target_sample = intervention_sample - 1
-
+    print("\tReading network file ...")
     metab_pathways = _read_file(os.path.join(abs_path, "human_metab_pathway_t.pkl"))
 
     g = nx.read_graphml(os.path.join(abs_path, "human_base_network.graphml"))
@@ -157,23 +143,6 @@ def _intervention_analysis(
                 rna_indices.add(rna_s[e[1]])
     del rna_s
 
-    # metab_init = pyg['metabolite'].x[:, intervention_sample]
-    # prot_init = pyg['protein'].x[:, intervention_sample]
-
-    pyg["protein"].x[:, target_sample] = (
-        pyg["protein"].x[:, intervention_sample].clone()
-    )
-    for i in prot_indices:
-        pyg["protein"].x[i, target_sample] = (
-            pyg["protein"].x[i, intervention_sample] * intervention_mult
-        )
-
-    pyg["rna"].x[:, target_sample] = pyg["rna"].x[:, intervention_sample].clone()
-    for i in rna_indices:
-        pyg["rna"].x[i, target_sample] = (
-            pyg["rna"].x[i, intervention_sample] * intervention_mult
-        )
-
     device = torch.device("cpu")
     model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
     model.load_state_dict(torch.load(weight_path, weights_only=True))
@@ -185,7 +154,20 @@ def _intervention_analysis(
     metab_init = out["metabolite"][:, intervention_sample]
     prot_init = out["protein"][:, intervention_sample]
 
-    protein_new = out["protein"][:, target_sample]
+    for i in prot_indices:
+        pyg["protein"].x[i, intervention_sample] = (
+            pyg["protein"].x[i, intervention_sample] * intervention_mult
+        )
+
+    for i in rna_indices:
+        pyg["rna"].x[i, intervention_sample] = (
+            pyg["rna"].x[i, intervention_sample] * intervention_mult
+        )
+
+    with torch.no_grad():
+        out = model(pyg.x_dict, pyg.edge_index_dict)
+
+    protein_new = out["protein"][:, intervention_sample]
     diff = np.array(protein_new - prot_init)
     temp_diff = np.abs(np.array(diff))
     temp_diff.sort()
@@ -204,7 +186,7 @@ def _intervention_analysis(
         diff_prots, short_prots, os.path.join(fig_path, "protein_change_human.png")
     )
 
-    metab_new = out["metabolite"][:, target_sample]
+    metab_new = out["metabolite"][:, intervention_sample]
     diff = np.array(metab_new - metab_init)
     temp_diff = np.abs(np.array(diff))
     temp_diff.sort()
@@ -213,25 +195,30 @@ def _intervention_analysis(
     short_metabs = np.array(metabs_l)[condition]
     diff_metab = diff[condition]
     _save_change_fig(
-        diff_metab, short_metabs, os.path.join(fig_path, "metabolite_change_human.png")
+        diff_metab,
+        short_metabs,
+        os.path.join(fig_path, "metabolite_change_human.png"),
+        omic="m",
     )
 
-    l1, l2, l3, l4 = get_pathway_mean_sum(intervention_sample, model, pyg, metabs_l)
-    l1l, l2l, l3l, l4l = get_pathway_mean_sum(target_sample, model, pyg, metabs_l)
+    l1, l2 = get_pathway_mean_sum(metab_init, metabs_l)
+    l1l, l2l = get_pathway_mean_sum(metab_new, metabs_l)
+
     pathway_change = {}
     for i in range(len(l2)):
         pathway_change[l2[i]] = (l1[i], l1l[l2l.index(l2[i])])
     comp_vals_sum = [l1l[l2l.index(i)] for i in l2]
-    comp_vals_avg = [l3l[l4l.index(i)] for i in l4]
+
     _save_pathway_diff_fig(
-        l1, comp_vals_sum, l2, os.path.join(fig_path, "pathway_sum_diff_human.png")
+        l1, comp_vals_sum, l2, os.path.join(fig_path, "pathway_diff_human.png")
     )
-    _save_pathway_diff_fig(
-        l3,
-        comp_vals_avg,
-        l4,
-        os.path.join(fig_path, "pathway_norm_diff_human.png"),
-        t="normalised",
+
+    rel_as_names, rel_as_scores = get_pathway_mean_sum(metab_new / metab_init, metabs_l)
+    _save_pathway_fig(
+        rel_as_scores,
+        rel_as_names,
+        os.path.join(fig_path, "rel_activity_post_intervention.png"),
+        plot_type="rel",
     )
     print("\tIntervention analysis plots saved")
 
@@ -280,7 +267,6 @@ def _save_change_fig(vals, names, path, omic="p"):
     x = np.arange(len(vals))
 
     fig, ax = plt.subplots(figsize=(18, 10))
-    # ax.bar(x - width/3, metab_init, width, label='Before', color='skyblue')
     ret = ax.bar(x, vals, 0.5, label="", color="navy" if omic == "p" else "salmon")
 
     ax.set_ylabel(
@@ -299,17 +285,17 @@ def _save_change_fig(vals, names, path, omic="p"):
     ax.set_xticks([i + 0.15 for i in x])
     ax.set_xticklabels(names, rotation=90, ha="right", fontsize=18)
     ax.set_yticklabels(ax.get_yticklabels(), fontsize=18)
-    ax.bar_label(ret, labels=[f"{val.get_height():.2f}" for val in ret])
+    ax.bar_label(ret, labels=[f"{val.get_height():.4f}" for val in ret])
     plt.tight_layout()
     plt.savefig(path, dpi=600)
 
 
-def _save_pathway_fig(vals, names, path, title):
+def _save_pathway_fig(vals, names, path, plot_type="abs"):
     plt.figure(dpi=600)
     fig, ax = plt.subplots()
     fig.set_figheight(10)
     fig.set_figwidth(20)
-    ret = ax.barh(vals[:10], names[:10], color="b" if title == "total" else "g")
+    ret = ax.barh(vals[:10], names[:10], color="b")
 
     ax.set_ylabel("Pathway", fontsize=22)
     ax.set_xlabel("Pathway activity", fontsize=22)
@@ -317,6 +303,11 @@ def _save_pathway_fig(vals, names, path, title):
     ax.set_xticklabels(ax.get_xticklabels(), ha="right", fontsize=18)
     ax.set_yticklabels(ax.get_yticklabels(), fontsize=18)
 
-    ax.bar_label(ret, fmt="{:,.2f}")
-    ax.set_title("Top 10 pathways by " + title + " activity for data", fontsize=22)
+    ax.bar_label(ret, fmt="{:,.2f}" if plot_type == "abs" else "{:,.4f}")
+    ax.set_title(
+        "Top 10 pathways by Activity Scores"
+        if plot_type == "abs"
+        else "Top 10 pathways by relative Activity Score post-intervention",
+        fontsize=22,
+    )
     plt.savefig(path, dpi=600, bbox_inches="tight")

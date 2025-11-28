@@ -34,7 +34,7 @@ def _create_dirs(cfg):
     return os.path.join(parent_dir, cfg.output.save_dir, exp_name)
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="base")
+@hydra.main(version_base=None, config_path="configs", config_name="main")
 def main(cfg: DictConfig):
     print("Configuration - ")
     print(OmegaConf.to_yaml(cfg))
@@ -70,42 +70,48 @@ def main(cfg: DictConfig):
         predefined_network=cfg.data.predefined_network,
         output_dir=output_dir,
         graph_name=cfg.data.get("base_network_file", "human_base_network.graphml"),
+        random_edges=cfg.data.get("random_edges", False),
+        n_random_edges_rna=cfg.data.get("n_random_edges_rna", 0),
+        n_random_edges_prot=cfg.data.get("n_random_edges_prot", 0),
         train_test_ratio=cfg.model.train_test_ratio,
         use_causal_edges=cfg.data.use_causal_edges,
+        rna_causal_method=cfg.causal.rna_method,
+        prot_causal_method=cfg.causal.prot_method
     )
 
-    print("Starting GNN training...")
     pyg_copy = copy.deepcopy(pyg)
-    _trainGNN(
-        pyg,
-        epochs=cfg.model.epochs,
-        weight_path=cfg.model.save_file,
-        save_dir=output_dir,
-        config=OmegaConf.to_container(cfg=cfg, resolve=True),
+    if cfg.model.train:
+        print("Starting GNN training...")
+        _trainGNN(
+            pyg,
+            epochs=cfg.model.epochs,
+            weight_path=cfg.model.save_file,
+            save_dir=output_dir,
+            config=OmegaConf.to_container(cfg=cfg, resolve=True),
+        )
+
+    metabs = list(metab_df.columns)[1:]
+    prots_l = list(prot_df.columns)[1:]
+    rna_l = list(rna_df.columns)[1:]
+    parent_dir = os.path.dirname(os.path.realpath(__file__))
+    weight_path = os.path.join(parent_dir, output_dir, "weights", cfg.model.save_file)
+
+    _pathway_analysis(
+        pyg_copy,
+        weight_path=weight_path,
+        metabs=metabs,
+        sample_id=cfg.intervention.sample,
+        output_dir=output_dir,
     )
 
-    if cfg.perform_intervention:
-        metabs = list(metab_df.columns)[1:]
-        prots_l = list(prot_df.columns)[1:]
-        rna_l = list(rna_df.columns)[1:]
-        parent_dir = os.path.dirname(os.path.realpath(__file__))
-        weight_path = os.path.join(
-            parent_dir, output_dir, "weights", cfg.model.save_file
-        )
-        _pathway_analysis(
-            pyg_copy,
-            weight_path=weight_path,
-            metabs=metabs,
-            sample_id=cfg.intervention.sample,
-            output_dir=output_dir,
-        )
+    if cfg.intervention.enabled:
         _intervention_analysis(
-            pyg,
-            cfg.intervention.pathway,
-            cfg.intervention.sample,
-            cfg.intervention.sample,
-            prots_l,
-            rna_l,
+            pyg=pyg,
+            interest_pathway=cfg.intervention.pathway,
+            intervention_sample=cfg.intervention.sample,
+            intervention_mult=cfg.intervention.mult,
+            prots_l=prots_l,
+            rna_l=rna_l,
             metabs_l=metabs,
             weight_path=weight_path,
             output_dir=output_dir,

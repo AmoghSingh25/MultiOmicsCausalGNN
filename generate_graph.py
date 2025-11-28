@@ -30,9 +30,9 @@ def _get_ppi_edges(org_name="mouse", significant_ppi=False):
     ppi_network_file = os.path.join(abs_path, org_name + "_ppi_network.txt")
     prot_info = pl.read_csv(ppi_info_file, separator="\t")
     ppi_net = pl.read_csv(ppi_network_file, separator=" ")
-    # prots_list = list(prot_info['preferred_name'])
+
     significant_ppi_arr = ppi_net.filter(pl.col("combined_score") >= 150)
-    # significant_ppi_arr = ppi_net.loc[ppi_net["combined_score"] >= 150]
+
     prot_map = {}
     for i in prot_info.to_numpy():
         prot_map[i[0]] = i[1]
@@ -47,15 +47,36 @@ def _get_ppi_edges(org_name="mouse", significant_ppi=False):
     renamed_ppi_net = pl.DataFrame(renamed_ppi_net, schema=["p1", "p2"])
     return renamed_ppi_net.to_numpy()
 
+def check_repeat_element_edges(arr):
+    dup_edges =[]
+    for i in range(len(arr)):
+        if arr[i][0] == arr[i][1]:
+            dup_edges.append(i)
+    return dup_edges
+
+def generate_random_edges(vals, req_shape):
+    random_edges = np.random.choice(list(range(len(vals))), size=req_shape)
+    dup_edges = check_repeat_element_edges(random_edges)
+    while len(dup_edges) > 0:
+        random_edges = np.delete(random_edges, dup_edges, axis=0)
+        random_edges = np.append(random_edges, np.random.choice(vals, size=(len(dup_edges), 2)), axis=0)
+        dup_edges = check_repeat_element_edges(random_edges)
+    return random_edges
+
 
 def _generate_graph(
-    rna_df,
-    prot_df,
-    metab_df,
+    rna_df:pl.DataFrame,
+    prot_df:pl.DataFrame,
+    metab_df:pl.DataFrame,
     predefined_network,
     graph_name,
+    random_edges,
+    n_random_edges_rna,
+    n_random_edges_prot,
     use_causal_edges,
     output_dir,
+    rna_causal_method,
+    prot_causal_method
 ):
     abs_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), output_dir, "network"
@@ -81,14 +102,24 @@ def _generate_graph(
     rp_edges = []
     pp_edges = []
     pm_edges = []
-    print("ABS PATH = ", abs_path)
+
+    random_rna_edges = []
+    random_prot_edges = []
+
+    if random_edges:
+        print("\tGenerating and adding in random edges")
+        random_rna_edges = generate_random_edges(rna_df.columns, req_shape=(n_random_edges_rna, 2))
+        random_prot_edges = generate_random_edges(list(prot_set_comp), req_shape=(n_random_edges_prot, 2))
+
     if use_causal_edges:
         if os.path.exists(
-            os.path.join(abs_path, "pp_causal_edges.pkl")
-        ) and os.path.exists(os.path.join(abs_path, "rr_causal_edges.pkl")):
-            print("Causal files found, adding in edges...")
-            rr_edges = _read_file(os.path.join(abs_path, "rr_causal_edges.pkl"))
-            pp_edges = _read_file(os.path.join(abs_path, "pp_causal_edges.pkl"))
+            os.path.join(abs_path, prot_causal_method + "_pp_causal_edges.pkl")
+        ):
+            print("Causal protein-protein edges found, adding in edges...")
+            pp_edges = _read_file(os.path.join(abs_path,  prot_causal_method + "_pp_causal_edges.pkl"))
+        if os.path.exists(os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl")):
+            print("Causal RNA-RNA edges found, adding in edges...")
+            rr_edges = _read_file(os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl"))
         else:
             print("Causal edges files not found... Continuing with base network")
 
@@ -106,7 +137,7 @@ def _generate_graph(
         pm_e = _read_file(os.path.join(abs_path, "pm_edges.pkl"))
 
         if len(rr_edges) > 0:
-            rr_e = np.append([rr_edges], rr_e, axis=0)
+            rr_e = np.append(rr_edges, rr_e, axis=0)
         if len(pp_edges) > 0:
             pp_e = np.append(pp_edges, pp_e, axis=0)
         return rr_e, rp_e, pp_e, pm_e
@@ -140,11 +171,13 @@ def _generate_graph(
                     idx = search_in_prot(i[0])
                     if idx is not None:
                         rp_edges.append((rna_vals_dict[i[1]], search_in_prot(i[0])))
-
-    rr_edges = np.array(rr_edges).astype(int)
-    rp_edges = np.array(rp_edges).astype(int)
-    pp_edges = np.array(pp_edges).astype(int)
-    pm_edges = np.array(pm_edges).astype(int)
+    rr_edges = np.array(rr_edges).astype(int).reshape((-1, 2))
+    rp_edges = np.array(rp_edges).astype(int).reshape((-1, 2))
+    pp_edges = np.array(pp_edges).astype(int).reshape((-1, 2))
+    pm_edges = np.array(pm_edges).astype(int).reshape((-1, 2))
+    if random_edges:
+        rr_edges = np.append(rr_edges, random_rna_edges, axis=0)
+        pp_edges = np.append(pp_edges, random_prot_edges, axis=0)
     _save_file(os.path.join(abs_path, "rr_edges.pkl"), rr_edges)
     _save_file(os.path.join(abs_path, "rp_edges.pkl"), rp_edges)
     _save_file(os.path.join(abs_path, "pp_edges.pkl"), pp_edges)
@@ -159,8 +192,13 @@ def _generate_pyg(
     predefined_network,
     output_dir,
     graph_name,
+    random_edges,
+    n_random_edges_rna,
+    n_random_edges_prot,
     train_test_ratio=0.7,
     use_causal_edges=False,
+    rna_causal_method="ges",
+    prot_causal_method="fci"
 ):
     assert (
         rna_data.shape[0] == prot_data.shape[0]
@@ -177,8 +215,13 @@ def _generate_pyg(
         metab_data,
         predefined_network,
         graph_name,
+        random_edges,
+        n_random_edges_rna,
+        n_random_edges_prot,
         use_causal_edges=use_causal_edges,
         output_dir=output_dir,
+        rna_causal_method=rna_causal_method,
+        prot_causal_method=prot_causal_method
     )
 
     train_size = int(train_test_ratio * rna_data.shape[0])
@@ -211,6 +254,7 @@ def _generate_pyg(
     pyg["protein"].y = torch.nn.functional.normalize(
         torch.FloatTensor(prot_inp.T), dim=0
     )
+
     pyg["protein"].train_mask = train_mask
     pyg["protein"].test_mask = train_mask_t
 
@@ -218,6 +262,12 @@ def _generate_pyg(
     pyg["metabolite"].y = torch.nn.functional.normalize(
         torch.FloatTensor(metab_inp.T), dim=0
     )
+
+    if torch.isnan(pyg["protein"].y).any():
+        pyg["protein"].y = torch.nan_to_num(pyg["protein"].y, nan=0.0)
+    if torch.isnan(pyg["metabolite"].y).any():
+        pyg["metabolite"].y = torch.nan_to_num(pyg["metabolite"].y, nan=0.0)
+
     pyg["metabolite"].train_mask = train_mask
     pyg["metabolite"].test_mask = train_mask_t
 
@@ -240,10 +290,6 @@ def _generate_pyg(
         pm_edges_t, is_undirected=False
     )
 
-    # print(pyg['rna', 'links', 'rna'].num_edges, "r-r", rr_edges_t.shape)
-    # print(pyg['protein', 'links', 'protein'].num_edges, "p-p", pp_edges_t.shape)
-    # print(pyg['rna', 'synth', 'protein'].num_edges, "r-p", pr_edges_t.shape)
-    # print(pyg['protein', 'prod', 'metabolite'].num_edges, "p-m", pm_edges_t.shape)
     print(
         f"\t RNA-RNA edges = {pyg['rna', 'links', 'rna'].num_edges}. Directed - {pyg['rna', 'links', 'rna'].num_edges == rr_edges_t.shape[1]}\t\t",
     )

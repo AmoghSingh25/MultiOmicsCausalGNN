@@ -1,30 +1,42 @@
 ---
-perform_intervention: true
+name: base_default
 model:
+  train: true
   epochs: 5
   train_test_ratio: 0.7
   save_file: saved_weights.pt
+  runs: 1
+  prot_loss: 0
+  metab_loss : 1
 data:
   dir: Data/
   org_name: human
-  predefined_network: true
+  random_edges: false
+  n_random_edges_rna: 20
+  n_random_edges_prot: 10
+  predefined_network: false
   use_ppi_network: true
   use_causal_edges: true
-  significant_ppi: false
+  significant_ppi: true
   rna_data: Data/input_data/rna_df.csv
   metab_data: Data/input_data/metab_df.csv
   prot_data: Data/input_data/prot_df.csv
   base_network_file: human_base_network.graphml
 causal:
-  method: fci
-  indep_test: kci
-  replaceNan: false
+  rna_method: ges
+  prot_method: fci
+  rna_indep_test: mv_fisherz
+  prot_indep_test: mv_fisherz
+  replaceNan: true
+  rna_keep:
+  prot_keep:
   llm:
     objective: # check, orient_check, orient, None
     model_id: meta-llama-3.1-8b-instruct
     temperature: 0.7
     rag: true
 intervention:
+  enabled: true
   sample: 1
   mult: 1.2
   pathway: Central carbon metabolism in cancer

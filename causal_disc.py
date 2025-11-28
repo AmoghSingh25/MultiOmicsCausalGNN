@@ -4,9 +4,9 @@ import polars as pl
 import os
 from causal_utils import run_cdnod, run_fci, run_ges, run_pc
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from llm_causal import run_llm
-from utils import _read_file
+from utils import _read_txt
 from sklearn.preprocessing import StandardScaler
 
 
@@ -20,7 +20,7 @@ def _run_causal_discovery(input_data, all_vals, method="pc", **kwargs):
     scaler = StandardScaler()
     input_data = pl.DataFrame(scaler.fit_transform(input_data.to_numpy()))
     input_data.columns = cols
-    
+
     assert method in possible_methods, "Invalid causal discovery method"
     try:
         if method == "fci":
@@ -50,7 +50,7 @@ def _run_causal_discovery(input_data, all_vals, method="pc", **kwargs):
     undirected_edges = []
     directed_edges = []
     edge_idxs = np.where(ret > 0)
-    print("\t DEBUG  --- ", edge_idxs)
+    print(edge_idxs)
     sub_vals = input_data.columns
     for i in range(len(edge_idxs[0])):
         edge_i = (sub_vals[edge_idxs[0][i]], sub_vals[edge_idxs[1][i]])
@@ -87,7 +87,7 @@ def _run_causal_discovery(input_data, all_vals, method="pc", **kwargs):
         undirected_edges=undirected_edges,
         directed_edges=directed_edges,
         input_data=input_data,
-        objective=kwargs["llm_objective"],
+        objective=None,
         use_rag=kwargs["use_rag"],
         rag_name=kwargs["rag_name"],
         llm_model_id=kwargs["llm_model_id"],
@@ -119,8 +119,10 @@ def _read_df(path, replaceNan=True, filt_vals=[]):
     filt_vals = set(filt_vals).intersection(
         set(df.columns)
     )  # Removing values not present in the DataFrame
+    filt_vals = list(filt_vals)
+    filt_vals.sort()
     if len(filt_vals) > 0:
-        df = df.select(sorted(filt_vals))
+        df = df.select(filt_vals)
     return df, df_cols
 
 
@@ -141,8 +143,11 @@ def _create_dirs(cfg):
             os.mkdir(i)
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="base")
+@hydra.main(version_base=None, config_path="configs", config_name="main")
 def main(cfg: DictConfig):
+    print("Configuration - ")
+    print(OmegaConf.to_yaml(cfg))
+
     _create_dirs(cfg)
     data_dir = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
@@ -166,7 +171,7 @@ def main(cfg: DictConfig):
         else:
             rna_filt = cfg.causal.rna_keep
     else:
-        rna_filt = _read_file(cfg.causal.filt_rna)
+        rna_filt = _read_txt(cfg.causal.filt_rna)
     rna_filt = list(rna_filt)
     print("\tNumber of RNAs to keep = ", len(rna_filt))
 
@@ -175,14 +180,15 @@ def main(cfg: DictConfig):
         replaceNan=cfg.causal.replaceNan,
         filt_vals=rna_filt,  # RNA IDs that must be kept for causal detection, others will be removed
     )
+    print("\tProcessed RNA shape - ", rna_df.shape)
 
     # If this raises AssertionError Cache mismatch, delete the Causal Discovery cache files
     rna_edges = _run_causal_discovery(
         input_data=rna_df,
-        method=cfg.causal.method,
+        method=cfg.causal.rna_method,
         all_vals=rna_vals,
-        indep_test=cfg.causal.indep_test,
-        cache_path=os.path.join(cache_dir, f"rna_cd_{cfg.causal.method}.json"),
+        indep_test=cfg.causal.rna_indep_test,
+        cache_path=os.path.join(cache_dir, f"rna_cd_{cfg.causal.rna_method}.json"),
         llm_objective=cfg.causal.llm.get("objective", None),
         llm_model_id=cfg.causal.llm.get("model_id", None),
         llm_temperature=cfg.causal.llm.get("temperature", 0.7),
@@ -194,9 +200,12 @@ def main(cfg: DictConfig):
             cfg.output.save_dir,
             cfg.get("name", "experiment"),
         ),
-        alpha=cfg.causal.get("alpha", 0.05)
+        alpha=cfg.causal.get("alpha", 0.05),
     )
-    _save_file(os.path.join(data_dir, "rr_causal_edges.pkl"), rna_edges)
+    _save_file(
+        os.path.join(data_dir, cfg.causal.rna_method + "_rr_causal_edges.pkl"),
+        rna_edges,
+    )
 
     print("Running Causal Discovery on Protein data...")
     if cfg.causal.filt_prot is None:
@@ -207,7 +216,7 @@ def main(cfg: DictConfig):
         else:
             prot_filt = cfg.causal.prot_keep
     else:
-        prot_filt = _read_file(cfg.causal.filt_prot)
+        prot_filt = _read_txt(cfg.causal.filt_prot)
     prot_filt = list(prot_filt)
     print("\tNumber of Proteins to keep = ", len(prot_filt))
 
@@ -220,10 +229,10 @@ def main(cfg: DictConfig):
     # If this raises AssertionError Cache mismatch, delete the Causal Discovery cache files
     prot_edges = _run_causal_discovery(
         input_data=prot_df,
-        method=cfg.causal.method,
+        method=cfg.causal.prot_method,
         all_vals=prot_vals,
-        indep_test=cfg.causal.indep_test,
-        cache_path=os.path.join(cache_dir, f"prot_cd_{cfg.causal.method}.json"),
+        indep_test=cfg.causal.rna_indep_test,
+        cache_path=os.path.join(cache_dir, f"prot_cd_{cfg.causal.prot_method}.json"),
         llm_objective=cfg.causal.llm.get("objective", None),
         llm_model_id=cfg.causal.llm.get("model_id", None),
         llm_temperature=cfg.causal.llm.get("temperature", 0.7),
@@ -235,9 +244,12 @@ def main(cfg: DictConfig):
             cfg.output.save_dir,
             cfg.get("name", "experiment"),
         ),
-        alpha=cfg.causal.get("alpha", 0.05)
+        alpha=cfg.causal.get("alpha", 0.05),
     )
-    _save_file(os.path.join(data_dir, "pp_causal_edges.pkl"), prot_edges)
+    _save_file(
+        os.path.join(data_dir, cfg.causal.prot_method + "_pp_causal_edges.pkl"),
+        prot_edges,
+    )
 
 
 if __name__ == "__main__":
