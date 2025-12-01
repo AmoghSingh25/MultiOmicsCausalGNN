@@ -7,7 +7,6 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import polars as pl
-
     return (pl,)
 
 

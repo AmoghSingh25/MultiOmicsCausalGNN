@@ -10,6 +10,6 @@ data:
   significant_ppi: false
   use_ppi_network: false
   random_edges: true
-  n_random_edges_rna: 23
-  n_random_edges_prot: 35
+  n_random_edges_rna: 162
+  n_random_edges_prot: 231
 perform_intervention: false

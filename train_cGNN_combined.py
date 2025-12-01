@@ -6,8 +6,7 @@ import torch
 from MultiLayerHuman import MultiLayerHuman
 from tqdm import tqdm
 from torch_geometric import seed_everything
-from omicsGraphDataset import OmicGraphDataset
-from torch_geometric.loader import DataLoader
+
 
 def _trainGNN(pyg, **kwargs):
     """
@@ -26,8 +25,8 @@ def _trainGNN(pyg, **kwargs):
     # Each pair contains the index of the feature from the first and second omic data respectively
     # Example, pm_edges - (Index of Protein feature, Index of Metabolite feature)
     """
-    cfg_device = kwargs['config']['model']['device']
-    device = torch.device(cfg_device)
+
+    device = torch.device("cpu")
     n_runs = kwargs["config"]["model"]["runs"]
     _timestamp = int(time.time())
     global_min_loss = sys.maxsize
@@ -35,21 +34,15 @@ def _trainGNN(pyg, **kwargs):
 
     for i in range(n_runs):
         print("\tRun No. = ", i + 1)
-
         seed_everything(kwargs['config']['model']['seed'][i])
-        train_dataset = OmicGraphDataset(pyg, device=cfg_device)
-        test_dataset = OmicGraphDataset(pyg, training=False, device=cfg_device)
-
-        train_loader = DataLoader(train_dataset, shuffle=True, batch_size=8)
-        test_loader = DataLoader(test_dataset, batch_size=8)
-
-        model = MultiLayerHuman(inp_dim=1).to(device)
+        model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optim, mode="min", factor=0.01, patience=5, min_lr=1e-12
         )
         loss_fn = torch.nn.MSELoss()
 
+        pyg = pyg.to(device)
         model = model.to(device)
 
         print("\tModel validation result = ", pyg.validate())
@@ -67,79 +60,55 @@ def _trainGNN(pyg, **kwargs):
         min_val_loss = sys.maxsize
 
         for _ in tqdm(range(kwargs["epochs"])):
-            loss_p, loss_m, loss_p_test, loss_m_test = 0,0,0,0
-            loss_comb_train, loss_comb_test = 0, 0
+            optim.zero_grad()
+            out = model(pyg.x_dict, pyg.edge_index_dict)
+            loss1 = loss_fn(
+                out["metabolite"][:, pyg["metabolite"].train_mask],
+                pyg["metabolite"].y[:, pyg["metabolite"].train_mask],
+            )
+            loss2 = loss_fn(
+                out["protein"][:, pyg["protein"].train_mask],
+                pyg["protein"].y[:, pyg["protein"].train_mask],
+            )
+            loss_comb = (
+                kwargs["config"]["model"]["metab_loss"] * loss1
+                + kwargs["config"]["model"]["prot_loss"] * loss2
+            )
 
-            # Loop over train samples
-            for sample_x in train_loader:
-                optim.zero_grad()
-                out = model(sample_x.x_dict, sample_x.edge_index_dict)
-                
-                loss1 = loss_fn(
-                    out["metabolite"],
-                    sample_x["metabolite"].y,
-                )
-                loss2 = loss_fn(
-                    out["protein"],
-                    sample_x["protein"].y,
-                )
-
-                loss_comb = (
-                    kwargs["config"]["model"]["metab_loss"] * loss1
-                    + kwargs["config"]["model"]["prot_loss"] * loss2
-                )
-
-                loss_m = loss_m + loss1
-                loss_p = loss_p + loss2
-                loss_comb_train = loss_comb_train + loss_comb
-
-                loss_comb.backward()
-                optim.step()
+            loss_comb.backward()
+            optim.step()
             scheduler.step(loss_comb)
 
-            # Loop over test samples
             with torch.no_grad():
-                for sample_x in test_loader:
-                    out = model(sample_x.x_dict, sample_x.edge_index_dict)
-                    
-                    loss1_test = loss_fn(
-                        out["metabolite"],
-                        sample_x["metabolite"].y,
-                    )
-                    loss2_test = loss_fn(
-                        out["protein"],
-                        sample_x["protein"].y,
-                    )
-                    loss_m_test = loss_m_test + loss1_test
-                    loss_p_test = loss_p_test + loss2_test
+                loss1_val = loss_fn(
+                    out["metabolite"][:, pyg["metabolite"].test_mask],
+                    pyg["metabolite"].y[:, pyg["metabolite"].test_mask],
+                )
+                loss2_val = loss_fn(
+                    out["protein"][:, pyg["protein"].test_mask],
+                    pyg["protein"].y[:, pyg["protein"].test_mask],
+                )
 
-                    loss_comb_test_i = kwargs["config"]["model"]["metab_loss"] * loss1_test + kwargs["config"]["model"]["metab_loss"] * loss2_test
-                    loss_comb_test = loss_comb_test + loss_comb_test_i 
+                loss_comb_val = (
+                    kwargs["config"]["model"]["metab_loss"] * loss1_val
+                    + kwargs["config"]["model"]["prot_loss"] * loss2_val
+                )
 
-            loss_m = loss_m / train_dataset.len()
-            loss_p = loss_p / train_dataset.len()
-            loss_comb_train = loss_comb_train / train_dataset.len()
-
-
-            loss_m_test = loss_m_test / test_dataset.len()
-            loss_p_test = loss_p_test / test_dataset.len()
-            loss_comb_test = loss_comb_test / test_dataset.len()
-
-            if loss_comb_test < min_val_loss:
+            if loss_comb_val < min_val_loss:
                 best_model_weight = model.state_dict()
-                min_val_loss = loss_comb_test.item()
+                min_val_loss = loss_comb_val.item()
 
-            if loss_comb_test < global_min_loss:
+            if loss_comb_val < global_min_loss:
                 global_best_weight = model.state_dict()
-                global_min_loss = loss_comb_test.item()
+                global_min_loss = loss_comb_val.item()
 
-            losses_metab.append(loss_m.item())
-            losses_prot.append(loss_p.item())
-            losses.append(loss_comb_train.item())
+            losses_metab.append(loss1.item())
+            losses_prot.append(loss2.item())
+            losses.append(loss_comb.item())
 
-            losses_val_metab.append(loss_m_test.item())
-            losses_val_prot.append(loss_p_test.item())
-            losses_val.append(loss_comb_test.item())
+            losses_val_metab.append(loss1_val.item())
+            losses_val_prot.append(loss2_val.item())
+            losses_val.append(loss_comb_val.item())
 
             lrs.append(scheduler.get_last_lr()[0])
 

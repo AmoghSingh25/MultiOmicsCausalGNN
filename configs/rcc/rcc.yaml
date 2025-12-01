@@ -9,6 +9,7 @@ model:
   runs: 5
   prot_loss: 0.6
   metab_loss : 0.4
+  device: mps
   seed:
     - 2729424255
     - 3683917037
@@ -16,6 +17,7 @@ model:
     - 2821685283
     - 4015210798
 data:
+  dir: Data/input_data/KidneyTumorData
   predefined_network: false
   use_causal_edges: true
   significant_ppi: false
@@ -25,8 +27,8 @@ data:
   prot_data: Data/input_data/KidneyTumorData/frmt_proteomics.csv
   base_network_file: human_base_network.graphml
 causal:
-  filt_rna: Data/input_data/KidneyTumorData/renal_cancer_gene_filt.txt
-  filt_prot: Data/input_data/KidneyTumorData/renal_cancer_prot_filt.txt
+  filt_rna: Data/input_data/KidneyTumorData/transcriptomics_filt_edges.txt
+  filt_prot: Data/input_data/KidneyTumorData/proteomics_filt_edges.txt
   llm:
     objective: None
     model_id: meta-llama-3.1-8b-instruct

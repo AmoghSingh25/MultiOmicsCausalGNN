@@ -94,6 +94,7 @@ def _(file_run_mapping, json, np, working_timestamps):
         metab_train_losses = []
         metab_test_losses = []
         comb_test_losses = []
+        print("Time stamp = ", _i)
         print("Config type = ", file_run_mapping[_i])
 
         for _j in range(5):
@@ -124,6 +125,11 @@ def _(file_run_mapping, json, np, working_timestamps):
         _print_stats("Metab test - ", metab_test_losses)
         _print_stats("Comb test - ", comb_test_losses)
         print("\n\n")
+    return
+
+
+@app.cell
+def _():
     return
 
 

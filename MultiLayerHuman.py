@@ -1,4 +1,4 @@
-from torch_geometric.nn import HeteroConv, GraphConv, HeteroDictLinear
+from torch_geometric.nn import HeteroConv, HeteroDictLinear, SAGEConv
 import torch.nn.functional as F
 import torch
 
@@ -13,11 +13,12 @@ class MultiLayerHuman(torch.nn.Module):
 
         self.conv1 = HeteroConv(
             {
-                ("rna", "links", "rna"): GraphConv(8, 16),
-                ("protein", "links", "protein"): GraphConv(8, 16),
-                ("rna", "synth", "protein"): GraphConv(8, 16),
-                ("protein", "prod", "metabolite"): GraphConv(8, 16),
-            }
+                ("rna", "links", "rna"): SAGEConv(8, 16),
+                ("protein", "interacts", "protein"): SAGEConv(8, 16),
+                ("rna", "synth", "protein"): SAGEConv(8, 16),
+                ("protein", "prod", "metabolite"): SAGEConv(8, 16),
+            },
+            aggr='mean'
         )
         self.norm2 = torch.nn.LayerNorm(16)
 
@@ -27,33 +28,36 @@ class MultiLayerHuman(torch.nn.Module):
 
         self.conv2 = HeteroConv(
             {
-                ("rna", "links", "rna"): GraphConv(16, 64),
-                ("protein", "links", "protein"): GraphConv(16, 64),
-                ("rna", "synth", "protein"): GraphConv(16, 64),
-                ("protein", "prod", "metabolite"): GraphConv(16, 64),
+                ("rna", "links", "rna"): SAGEConv(16, 64),
+                ("protein", "interacts", "protein"): SAGEConv(16, 64),
+                ("rna", "synth", "protein"): SAGEConv(16, 64),
+                ("protein", "prod", "metabolite"): SAGEConv(16, 64),
             }
+            ,aggr='mean'
         )
         self.norm3 = torch.nn.LayerNorm(64)
 
         self.conv3 = HeteroConv(
             {
-                ("rna", "links", "rna"): GraphConv(64, 64),
-                ("protein", "links", "protein"): GraphConv(64, 64),
-                ("rna", "synth", "protein"): GraphConv(64, 64),
-                ("protein", "prod", "metabolite"): GraphConv(64, 64),
-            }
+                ("rna", "links", "rna"): SAGEConv(64, 64),
+                ("protein", "interacts", "protein"): SAGEConv(64, 64),
+                ("rna", "synth", "protein"): SAGEConv(64, 64),
+                ("protein", "prod", "metabolite"): SAGEConv(64, 64),
+            },
+            aggr='mean'
         )
         self.norm4 = torch.nn.LayerNorm(64)
 
-        self.conv4 = HeteroConv(
-            {
-                ("rna", "links", "rna"): GraphConv(64, 128),
-                ("protein", "links", "protein"): GraphConv(64, 128),
-                ("rna", "synth", "protein"): GraphConv(64, 128),
-                ("protein", "prod", "metabolite"): GraphConv(64, 128),
-            }
-        )
-        self.norm5 = torch.nn.LayerNorm(128)
+        # self.conv4 = HeteroConv(
+        #     {
+        #         ("rna", "links", "rna"): GraphConv(64, 128),
+        #         ("protein", "links", "protein"): GraphConv(64, 128),
+        #         ("rna", "synth", "protein"): GraphConv(64, 128),
+        #         ("protein", "prod", "metabolite"): GraphConv(64, 128),
+        #     },
+        #     aggr='mean'
+        # )
+        # self.norm5 = torch.nn.LayerNorm(128)
 
         self.lin2 = HeteroDictLinear(
             in_channels=64, out_channels=inp_dim, types=["rna", "protein", "metabolite"]
@@ -75,4 +79,5 @@ class MultiLayerHuman(torch.nn.Module):
 
         x_dict = self.lin2(x_dict)
         x_dict = {k: F.softplus(v) for k, v in x_dict.items()}
+
         return x_dict

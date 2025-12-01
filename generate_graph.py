@@ -31,8 +31,7 @@ def _get_ppi_edges(org_name="mouse", significant_ppi=False):
     prot_info = pl.read_csv(ppi_info_file, separator="\t")
     ppi_net = pl.read_csv(ppi_network_file, separator=" ")
 
-    significant_ppi_arr = ppi_net.filter(pl.col("combined_score") >= 150)
-
+    significant_ppi_arr = ppi_net.filter(pl.col("combined_score") >= 990)
     prot_map = {}
     for i in prot_info.to_numpy():
         prot_map[i[0]] = i[1]
@@ -198,7 +197,9 @@ def _generate_pyg(
     train_test_ratio=0.7,
     use_causal_edges=False,
     rna_causal_method="ges",
-    prot_causal_method="fci"
+    prot_causal_method="fci",
+    seed=None,
+    device="cpu"
 ):
     assert (
         rna_data.shape[0] == prot_data.shape[0]
@@ -207,7 +208,8 @@ def _generate_pyg(
     assert train_test_ratio > 0 and train_test_ratio <= 1, (
         "Train-test ratio out of bounds (0<r<=1)"
     )
-    device = torch.device("cpu")
+    device = torch.device(device)
+    np.random.seed(seed)
 
     rr_edges, rp_edges, pp_edges, pm_edges = _generate_graph(
         rna_data,
@@ -228,11 +230,9 @@ def _generate_pyg(
     train_mask = np.zeros(rna_data.shape[0])
     train_mask[:train_size] = 1
     np.random.shuffle(train_mask)
-    train_mask_t = np.abs(1 - train_mask)
+    test_mask = np.abs(1 - train_mask)
     train_mask = train_mask.astype(bool)
-    train_mask_t = train_mask_t.astype(bool)
-
-    pyg = HeteroData()
+    test_mask = test_mask.astype(bool)
 
     prot_inp = np.array(prot_data)
     prot_inp = np.nan_to_num(prot_inp, 0)
@@ -246,9 +246,11 @@ def _generate_pyg(
     rna_inp = np.nan_to_num(rna_inp, 0)
     rna_inp = rna_inp[:, 1:].astype(np.float64)
 
+    pyg = HeteroData()
+
     pyg["rna"].x = torch.nn.functional.normalize(torch.FloatTensor(rna_inp.T), dim=0)
     pyg["rna"].train_mask = train_mask
-    pyg["rna"].test_mask = train_mask_t
+    pyg["rna"].test_mask = test_mask
 
     pyg["protein"].x = torch.randn(prot_inp.shape[1], prot_inp.shape[0])
     pyg["protein"].y = torch.nn.functional.normalize(
@@ -256,7 +258,7 @@ def _generate_pyg(
     )
 
     pyg["protein"].train_mask = train_mask
-    pyg["protein"].test_mask = train_mask_t
+    pyg["protein"].test_mask = test_mask
 
     pyg["metabolite"].x = torch.randn(metab_inp.shape[1], metab_inp.shape[0])
     pyg["metabolite"].y = torch.nn.functional.normalize(
@@ -269,7 +271,7 @@ def _generate_pyg(
         pyg["metabolite"].y = torch.nan_to_num(pyg["metabolite"].y, nan=0.0)
 
     pyg["metabolite"].train_mask = train_mask
-    pyg["metabolite"].test_mask = train_mask_t
+    pyg["metabolite"].test_mask = test_mask
 
     pp_edges = np.array(pp_edges).astype(int)
 
@@ -279,7 +281,7 @@ def _generate_pyg(
     pm_edges_t = torch.tensor(pm_edges).t().contiguous()
 
     pyg["rna", "links", "rna"].edge_index = EdgeIndex(rr_edges_t, is_undirected=False)
-    pyg["protein", "links", "protein"].edge_index = EdgeIndex(
+    pyg["protein", "interacts", "protein"].edge_index = EdgeIndex(
         pp_edges_t, is_undirected=False
     )
 
@@ -294,7 +296,7 @@ def _generate_pyg(
         f"\t RNA-RNA edges = {pyg['rna', 'links', 'rna'].num_edges}. Directed - {pyg['rna', 'links', 'rna'].num_edges == rr_edges_t.shape[1]}\t\t",
     )
     print(
-        f"\t Protein-Protein edges = {pyg['protein', 'links', 'protein'].num_edges}. Directed - {pyg['protein', 'links', 'protein'].num_edges == pp_edges_t.shape[1]}\t\t",
+        f"\t Protein-Protein edges = {pyg['protein', 'interacts', 'protein'].num_edges}. Directed - {pyg['protein', 'interacts', 'protein'].num_edges == pp_edges_t.shape[1]}\t\t",
     )
     print(
         f"\t RNA-Protein edges = {pyg['rna', 'synth', 'protein'].num_edges}. Directed - {pyg['rna', 'synth', 'protein'].num_edges == pr_edges_t.shape[1]}\t\t",

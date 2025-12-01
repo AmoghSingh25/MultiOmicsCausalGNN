@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bs4>=0.0.2",
-    "causal-learn>=0.1.4.3",
+    "causal-learn==0.1.4.1",
     "cdt>=0.6.0",
     "dotenv>=0.9.9",
     "fastexcel>=0.16.0",
@@ -23,6 +23,7 @@ dependencies = [
     "numpy>=2.3.4",
     "polars>=1.35.2",
     "pre-commit>=4.4.0",
+    "pydeseq2>=0.5.3",
     "ruff>=0.14.4",
     "scikit-learn>=1.7.2",
     "torch",

@@ -7,6 +7,7 @@
 # Perform interventions on the learnt graph
 
 from train_causalGNN import _trainGNN
+from train_cGNN_combined import _trainGNN as _trainGNN_combined
 from generate_graph import _generate_pyg
 import polars as pl
 from analysis import _pathway_analysis, _intervention_analysis
@@ -63,6 +64,7 @@ def main(cfg: DictConfig):
     )
 
     print("\tCreating graph...")
+    seed_1 = cfg['model']['seed'][0]
     pyg = _generate_pyg(
         rna_data=rna_df,
         prot_data=prot_df,
@@ -76,19 +78,31 @@ def main(cfg: DictConfig):
         train_test_ratio=cfg.model.train_test_ratio,
         use_causal_edges=cfg.data.use_causal_edges,
         rna_causal_method=cfg.causal.rna_method,
-        prot_causal_method=cfg.causal.prot_method
+        prot_causal_method=cfg.causal.prot_method,
+        seed=seed_1,
+        device=cfg.model.get("device", "cpu")
     )
 
     pyg_copy = copy.deepcopy(pyg)
     if cfg.model.train:
-        print("Starting GNN training...")
-        _trainGNN(
-            pyg,
-            epochs=cfg.model.epochs,
-            weight_path=cfg.model.save_file,
-            save_dir=output_dir,
-            config=OmegaConf.to_container(cfg=cfg, resolve=True),
-        )
+        if cfg.model.train_single_sample:
+            print("Starting GNN training on single samples...")
+            _trainGNN(
+                pyg,
+                epochs=cfg.model.epochs,
+                weight_path=cfg.model.save_file,
+                save_dir=output_dir,
+                config=OmegaConf.to_container(cfg=cfg, resolve=True),
+            )
+        else:
+            print("Starting GNN training on combined samples...")
+            _trainGNN_combined(
+                pyg,
+                epochs=cfg.model.epochs,
+                weight_path=cfg.model.save_file,
+                save_dir=output_dir,
+                config=OmegaConf.to_container(cfg=cfg, resolve=True),
+            )
 
     metabs = list(metab_df.columns)[1:]
     prots_l = list(prot_df.columns)[1:]
