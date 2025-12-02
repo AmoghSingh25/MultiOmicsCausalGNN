@@ -8,11 +8,11 @@ app = marimo.App(width="medium")
 def _():
     import marimo as mo
     import numpy as np
-    import copy
     import polars as pl
     from scipy import stats
     from tqdm import tqdm
     from statsmodels.stats.multitest import multipletests
+
     return mo, multipletests, np, pl, stats, tqdm
 
 
@@ -56,7 +56,7 @@ def _(dfs, id_cols, multipletests, np, start_ids, stats, tqdm):
             stat_j = stats.ttest_ind(_p1, _p2, equal_var=True)
             pvals.append(stat_j.pvalue)
             logfc.append(_p2.mean() - _p1.mean())
-        ent_ids = dfs[1][id_cols[1]].to_list()
+        # ent_ids = dfs[1][id_cols[1]].to_list()
         _pvals = np.nan_to_num(pvals, nan=1.0, posinf=1.0, neginf=1.0)
         fdrs = multipletests(_pvals, method="fdr_bh")
         _a = np.where(np.abs(np.array(logfc)) > 1)[0]
@@ -65,6 +65,7 @@ def _(dfs, id_cols, multipletests, np, start_ids, stats, tqdm):
         _s = set(_a)
         _s.intersection_update(_b)
         return list(_s)
+
     return (return_filt,)
 
 
@@ -84,10 +85,10 @@ def _(dfs, return_filt):
     ) as _file:
         _file.write("\n".join(gene_list))
 
-    with open(
-        "Data/input_data/KidneyTumorData/transcriptomics_filt_edges.txt", "r"
-    ) as _file:
-        gene_list_2 = _file.read()
+    # with open(
+    #     "Data/input_data/KidneyTumorData/transcriptomics_filt_edges.txt", "r"
+    # ) as _file:
+    #     gene_list_2 = _file.read()
     return
 
 
@@ -111,22 +112,18 @@ def _(dfs, pl, return_filt):
     prot_list.extend(prot_list_rcc)
     prot_list = [x.strip() for x in list(set(prot_list))]
 
-
     def _new_id_prot(refseq_ids):
         _prot_mapping = pl.read_csv(
             "Data/input_data/KidneyTumorData/prot_mapping.tsv", separator="\t"
         )
         _conv_ids = []
         for _i in refseq_ids:
-            _search = _prot_mapping.filter(pl.col("From") == _i)[
-                "Entry Name"
-            ].to_list()
+            _search = _prot_mapping.filter(pl.col("From") == _i)["Entry Name"].to_list()
             if len(_search) == 0:
                 # print("No Entries for ", _i)
                 continue
             _conv_ids.extend(_search)
         return _conv_ids
-
 
     conv_ids = _new_id_prot(prot_list)
 
@@ -135,10 +132,10 @@ def _(dfs, pl, return_filt):
     ) as _file:
         _file.write("\n".join(conv_ids))
 
-    with open(
-        "Data/input_data/KidneyTumorData/proteomics_filt_edges.txt", "r"
-    ) as _file:
-        prot_list_2 = _file.read()
+    # with open(
+    #     "Data/input_data/KidneyTumorData/proteomics_filt_edges.txt", "r"
+    # ) as _file:
+    #     prot_list_2 = _file.read()
     return
 
 

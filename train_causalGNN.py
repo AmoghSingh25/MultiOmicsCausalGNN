@@ -9,6 +9,7 @@ from torch_geometric import seed_everything
 from omicsGraphDataset import OmicGraphDataset
 from torch_geometric.loader import DataLoader
 
+
 def _trainGNN(pyg, **kwargs):
     """
     # Omic data containing the number of samples and the features of each sample
@@ -26,7 +27,7 @@ def _trainGNN(pyg, **kwargs):
     # Each pair contains the index of the feature from the first and second omic data respectively
     # Example, pm_edges - (Index of Protein feature, Index of Metabolite feature)
     """
-    cfg_device = kwargs['config']['model']['device']
+    cfg_device = kwargs["config"]["model"]["device"]
     device = torch.device(cfg_device)
     n_runs = kwargs["config"]["model"]["runs"]
     _timestamp = int(time.time())
@@ -36,7 +37,7 @@ def _trainGNN(pyg, **kwargs):
     for i in range(n_runs):
         print("\tRun No. = ", i + 1)
 
-        seed_everything(kwargs['config']['model']['seed'][i])
+        seed_everything(kwargs["config"]["model"]["seed"][i])
         train_dataset = OmicGraphDataset(pyg, device=cfg_device)
         test_dataset = OmicGraphDataset(pyg, training=False, device=cfg_device)
 
@@ -67,14 +68,14 @@ def _trainGNN(pyg, **kwargs):
         min_val_loss = sys.maxsize
 
         for _ in tqdm(range(kwargs["epochs"])):
-            loss_p, loss_m, loss_p_test, loss_m_test = 0,0,0,0
+            loss_p, loss_m, loss_p_test, loss_m_test = 0, 0, 0, 0
             loss_comb_train, loss_comb_test = 0, 0
 
             # Loop over train samples
             for sample_x in train_loader:
                 optim.zero_grad()
                 out = model(sample_x.x_dict, sample_x.edge_index_dict)
-                
+
                 loss1 = loss_fn(
                     out["metabolite"],
                     sample_x["metabolite"].y,
@@ -101,7 +102,7 @@ def _trainGNN(pyg, **kwargs):
             with torch.no_grad():
                 for sample_x in test_loader:
                     out = model(sample_x.x_dict, sample_x.edge_index_dict)
-                    
+
                     loss1_test = loss_fn(
                         out["metabolite"],
                         sample_x["metabolite"].y,
@@ -113,13 +114,15 @@ def _trainGNN(pyg, **kwargs):
                     loss_m_test = loss_m_test + loss1_test
                     loss_p_test = loss_p_test + loss2_test
 
-                    loss_comb_test_i = kwargs["config"]["model"]["metab_loss"] * loss1_test + kwargs["config"]["model"]["metab_loss"] * loss2_test
-                    loss_comb_test = loss_comb_test + loss_comb_test_i 
+                    loss_comb_test_i = (
+                        kwargs["config"]["model"]["metab_loss"] * loss1_test
+                        + kwargs["config"]["model"]["prot_loss"] * loss2_test
+                    )
+                    loss_comb_test = loss_comb_test + loss_comb_test_i
 
             loss_m = loss_m / train_dataset.len()
             loss_p = loss_p / train_dataset.len()
             loss_comb_train = loss_comb_train / train_dataset.len()
-
 
             loss_m_test = loss_m_test / test_dataset.len()
             loss_p_test = loss_p_test / test_dataset.len()
@@ -158,10 +161,12 @@ def _trainGNN(pyg, **kwargs):
                 "comb": losses_val,
             },
             "loss_train": {"prot": losses_prot, "metab": losses_metab, "comb": losses},
-            "lrs":lrs,
+            "lrs": lrs,
             "timestamp": _timestamp,
             "config": kwargs["config"],
-            "name": time.time() if kwargs["config"]["name"] is None else kwargs["config"]["name"],
+            "name": time.time()
+            if kwargs["config"]["name"] is None
+            else kwargs["config"]["name"],
         }
 
         log_path = os.path.join(

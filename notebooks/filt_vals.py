@@ -11,6 +11,7 @@ def _():
     import numpy as np
     import polars as pl
     import json
+
     return json, np, os, pickle, pl
 
 
@@ -22,11 +23,9 @@ def _(os, pickle):
 
     _base_dir = "Data/input_data/KidneyTumorData/"
 
-
     def _save_file(path, var):
         with open(path, "wb") as file:
             pickle.dump(var, file)
-
 
     _save_file(
         os.path.join(_base_dir, "renal_cancer_gene_filt") + ".pkl", list(_sel_genes)
@@ -38,12 +37,10 @@ def _(os, pickle):
 def _(os, pickle):
     _base_dir = "Data/input_data/KidneyTumorData/"
 
-
     def _read_file(path):
         with open(path, "rb") as file:
             myvar = pickle.load(file)
         return myvar
-
 
     _var = _read_file(os.path.join(_base_dir, "renal_cancer_gene_filt.pkl"))
     for _i in _var:
@@ -68,7 +65,6 @@ def _(pickle):
         with open(path, "rb") as file:
             var = pickle.load(file)
         return var
-
 
     _var = _read_file("Data/input_data/data2/proteomics_filt_edges.pkl")
 
@@ -97,9 +93,7 @@ def _(filt_genes, pl):
 
     for _i in range(len(_file_paths)):
         dfs.append(
-            pl.read_csv(
-                _file_paths[_i], null_values=["Nan", "nan", "N/A", "", "NA"]
-            )
+            pl.read_csv(_file_paths[_i], null_values=["Nan", "nan", "N/A", "", "NA"])
         )
         if _i == 3:
             print(dfs[_i].head())
@@ -115,13 +109,11 @@ def _(cols, dfs, file_names, filt_genes, max_null_count, np, os, pickle, pl):
         with open(path, "wb") as file:
             pickle.dump(var, file)
 
-
     def _save_txt(path, _l):
         _file = open(path, "w")
         for _i in _l:
             _file.write(_i + "\n")
         _file.close()
-
 
     def _new_id_prot(refseq_ids):
         _prot_mapping = pl.read_csv(
@@ -129,15 +121,12 @@ def _(cols, dfs, file_names, filt_genes, max_null_count, np, os, pickle, pl):
         )
         _conv_ids = []
         for _i in refseq_ids:
-            _search = _prot_mapping.filter(pl.col("From") == _i)[
-                "Entry Name"
-            ].to_list()
+            _search = _prot_mapping.filter(pl.col("From") == _i)["Entry Name"].to_list()
             if len(_search) == 0:
                 # print("No Entries for ", _i)
                 continue
             _conv_ids.extend(_search)
         return _conv_ids
-
 
     _base_dir = "Data/input_data/KidneyTumorData/"
 

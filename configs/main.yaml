@@ -1,5 +1,6 @@
 ---
 name: base_default
+description: Base config description
 model:
   train: true
   epochs: 5
@@ -9,6 +10,7 @@ model:
   runs: 1
   prot_loss: 0
   metab_loss : 1
+  drop_edges: 0.5
 data:
   dir: Data/
   org_name: human

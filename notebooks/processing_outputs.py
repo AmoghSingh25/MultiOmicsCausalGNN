@@ -11,17 +11,15 @@ def _():
 
     sys.path.append(os.path.abspath("."))
 
-    from utils import _read_file
     import os
     import json
     import numpy as np
-    import matplotlib.pyplot as plt
+
     return json, np, os
 
 
 @app.cell
 def _(os):
-    filt_dirs = [x for x in os.listdir("output/") if x.startswith("rcc_")]
     return
 
 
@@ -78,11 +76,8 @@ def _(np):
         def stat_loss(arr):
             return np.min(arr), np.mean(arr)
 
-        prot_train_loss = []  # Min, Average
-        metab_train_loss = []  # Min, Average
-        prot_test_loss = []  # Min, Average
-        metab_test_loss = []  # Min, Average
         print(stat_loss(inp["loss_val"]["prot"]))
+
     return
 
 

@@ -18,7 +18,6 @@ def get_top_pathways(p_s, p_n):
 
 
 def get_pathway_mean_sum(metab_vals, metabs):
-
     abs_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Data")
 
     metab_pathways = _read_file(os.path.join(abs_path, "human_metab_pathway_t.pkl"))
@@ -91,11 +90,20 @@ def _pathway_analysis(pyg, weight_path, metabs, sample_id, output_dir):
     print("\tPathway analysis graphs saved to ", abs_path)
     _save_pathway_fig(names, comp_vals, os.path.join(abs_path, "activity_scores.png"))
 
-def _single_sample_inference(pyg, device, weight_path, intervention_sample, intervention_mult, prot_indices, rna_indices):
+
+def _single_sample_inference(
+    pyg,
+    device,
+    weight_path,
+    intervention_sample,
+    intervention_mult,
+    prot_indices,
+    rna_indices,
+):
     model = MultiLayerHuman(inp_dim=1).to(device)
     model.load_state_dict(torch.load(weight_path, weights_only=True))
     model.eval()
-    
+
     dataset = OmicGraphDataset(pyg, mask=False, drop_edges=False)
     sample_data = dataset.get(intervention_sample)
 
@@ -106,24 +114,28 @@ def _single_sample_inference(pyg, device, weight_path, intervention_sample, inte
     prot_init = out["protein"]
 
     for i in prot_indices:
-        sample_data["protein"].x[i] = (
-            sample_data["protein"].x[i] * intervention_mult
-        )
+        sample_data["protein"].x[i] = sample_data["protein"].x[i] * intervention_mult
 
     for i in rna_indices:
-        sample_data["rna"].x[i] = (
-            sample_data["rna"].x[i] * intervention_mult
-        )
+        sample_data["rna"].x[i] = sample_data["rna"].x[i] * intervention_mult
 
     with torch.no_grad():
         out = model(sample_data.x_dict, sample_data.edge_index_dict)
 
     protein_new = out["protein"]
-    metab_new = out['metabolite']
+    metab_new = out["metabolite"]
     return prot_init, metab_init, protein_new, metab_new
 
 
-def _comb_sample_inference(pyg, device, weight_path, intervention_sample, intervention_mult, prot_indices, rna_indices):
+def _comb_sample_inference(
+    pyg,
+    device,
+    weight_path,
+    intervention_sample,
+    intervention_mult,
+    prot_indices,
+    rna_indices,
+):
     model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
     model.load_state_dict(torch.load(weight_path, weights_only=True))
     model.eval()
@@ -148,7 +160,7 @@ def _comb_sample_inference(pyg, device, weight_path, intervention_sample, interv
         out = model(pyg.x_dict, pyg.edge_index_dict)
 
     protein_new = out["protein"][:, intervention_sample]
-    metab_new = out['metabolite'][:, intervention_sample]
+    metab_new = out["metabolite"][:, intervention_sample]
     return prot_init, metab_init, protein_new, metab_new
 
 
@@ -163,7 +175,7 @@ def _intervention_analysis(
     weight_path,
     output_dir,
     single_sample_model=False,
-    device="cpu"
+    device="cpu",
 ):
     print("Performing intervention analysis...")
     metab_pathway = set()
@@ -210,11 +222,26 @@ def _intervention_analysis(
 
     device = torch.device(device)
     if single_sample_model:
-        prot_init, metab_init, protein_new, metab_new = _single_sample_inference(pyg, device, weight_path, intervention_sample, intervention_mult, prot_indices, rna_indices)
+        prot_init, metab_init, protein_new, metab_new = _single_sample_inference(
+            pyg,
+            device,
+            weight_path,
+            intervention_sample,
+            intervention_mult,
+            prot_indices,
+            rna_indices,
+        )
     else:
-        prot_init, metab_init, protein_new, metab_new = _comb_sample_inference(pyg, device, weight_path, intervention_sample, intervention_mult, prot_indices, rna_indices)
+        prot_init, metab_init, protein_new, metab_new = _comb_sample_inference(
+            pyg,
+            device,
+            weight_path,
+            intervention_sample,
+            intervention_mult,
+            prot_indices,
+            rna_indices,
+        )
 
-    
     diff = np.array(protein_new - prot_init)
     temp_diff = np.abs(np.array(diff))
     temp_diff.sort()
@@ -330,7 +357,7 @@ def _save_change_fig(vals, names, path, omic="p"):
     )
     ax.set_xticks([i + 0.15 for i in x])
     ax.set_xticklabels(names, rotation=90, ha="right", fontsize=18)
-    ax.tick_params(axis='y', labelsize=18)
+    ax.tick_params(axis="y", labelsize=18)
     ax.bar_label(ret, labels=[f"{bar.get_height():.6e}" for bar in ret])
     plt.tight_layout()
     plt.savefig(path, dpi=600)

@@ -46,27 +46,31 @@ def _get_ppi_edges(org_name="mouse", significant_ppi=False):
     renamed_ppi_net = pl.DataFrame(renamed_ppi_net, schema=["p1", "p2"])
     return renamed_ppi_net.to_numpy()
 
+
 def check_repeat_element_edges(arr):
-    dup_edges =[]
+    dup_edges = []
     for i in range(len(arr)):
         if arr[i][0] == arr[i][1]:
             dup_edges.append(i)
     return dup_edges
+
 
 def generate_random_edges(vals, req_shape):
     random_edges = np.random.choice(list(range(len(vals))), size=req_shape)
     dup_edges = check_repeat_element_edges(random_edges)
     while len(dup_edges) > 0:
         random_edges = np.delete(random_edges, dup_edges, axis=0)
-        random_edges = np.append(random_edges, np.random.choice(vals, size=(len(dup_edges), 2)), axis=0)
+        random_edges = np.append(
+            random_edges, np.random.choice(vals, size=(len(dup_edges), 2)), axis=0
+        )
         dup_edges = check_repeat_element_edges(random_edges)
     return random_edges
 
 
 def _generate_graph(
-    rna_df:pl.DataFrame,
-    prot_df:pl.DataFrame,
-    metab_df:pl.DataFrame,
+    rna_df: pl.DataFrame,
+    prot_df: pl.DataFrame,
+    metab_df: pl.DataFrame,
     predefined_network,
     graph_name,
     random_edges,
@@ -75,7 +79,7 @@ def _generate_graph(
     use_causal_edges,
     output_dir,
     rna_causal_method,
-    prot_causal_method
+    prot_causal_method,
 ):
     abs_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), output_dir, "network"
@@ -107,18 +111,28 @@ def _generate_graph(
 
     if random_edges:
         print("\tGenerating and adding in random edges")
-        random_rna_edges = generate_random_edges(rna_df.columns, req_shape=(n_random_edges_rna, 2))
-        random_prot_edges = generate_random_edges(list(prot_set_comp), req_shape=(n_random_edges_prot, 2))
+        random_rna_edges = generate_random_edges(
+            rna_df.columns, req_shape=(n_random_edges_rna, 2)
+        )
+        random_prot_edges = generate_random_edges(
+            list(prot_set_comp), req_shape=(n_random_edges_prot, 2)
+        )
 
     if use_causal_edges:
         if os.path.exists(
             os.path.join(abs_path, prot_causal_method + "_pp_causal_edges.pkl")
         ):
             print("Causal protein-protein edges found, adding in edges...")
-            pp_edges = _read_file(os.path.join(abs_path,  prot_causal_method + "_pp_causal_edges.pkl"))
-        if os.path.exists(os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl")):
+            pp_edges = _read_file(
+                os.path.join(abs_path, prot_causal_method + "_pp_causal_edges.pkl")
+            )
+        if os.path.exists(
+            os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl")
+        ):
             print("Causal RNA-RNA edges found, adding in edges...")
-            rr_edges = _read_file(os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl"))
+            rr_edges = _read_file(
+                os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl")
+            )
         else:
             print("Causal edges files not found... Continuing with base network")
 
@@ -199,7 +213,7 @@ def _generate_pyg(
     rna_causal_method="ges",
     prot_causal_method="fci",
     seed=None,
-    device="cpu"
+    device="cpu",
 ):
     assert (
         rna_data.shape[0] == prot_data.shape[0]
@@ -223,7 +237,7 @@ def _generate_pyg(
         use_causal_edges=use_causal_edges,
         output_dir=output_dir,
         rna_causal_method=rna_causal_method,
-        prot_causal_method=prot_causal_method
+        prot_causal_method=prot_causal_method,
     )
 
     train_size = int(train_test_ratio * rna_data.shape[0])
@@ -248,13 +262,13 @@ def _generate_pyg(
 
     pyg = HeteroData()
 
-    pyg["rna"].x = torch.nn.functional.normalize(torch.FloatTensor(rna_inp.T), dim=0)
+    pyg["rna"].x = torch.nn.functional.normalize(torch.FloatTensor(rna_inp.T), dim=1)
     pyg["rna"].train_mask = train_mask
     pyg["rna"].test_mask = test_mask
 
     pyg["protein"].x = torch.randn(prot_inp.shape[1], prot_inp.shape[0])
     pyg["protein"].y = torch.nn.functional.normalize(
-        torch.FloatTensor(prot_inp.T), dim=0
+        torch.FloatTensor(prot_inp.T), dim=1
     )
 
     pyg["protein"].train_mask = train_mask
@@ -262,7 +276,7 @@ def _generate_pyg(
 
     pyg["metabolite"].x = torch.randn(metab_inp.shape[1], metab_inp.shape[0])
     pyg["metabolite"].y = torch.nn.functional.normalize(
-        torch.FloatTensor(metab_inp.T), dim=0
+        torch.FloatTensor(metab_inp.T), dim=1
     )
 
     if torch.isnan(pyg["protein"].y).any():

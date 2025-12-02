@@ -13,7 +13,7 @@ from sklearn.preprocessing import StandardScaler
 def _run_causal_discovery(input_data, all_vals, method="pc", **kwargs):
     # Input data is a Dataframe with columns containing names of the features - proteins, metabolites, RNAs
     # Rows are samples
-    print("\tCD method = ", method, "\tTest method = ", kwargs['indep_test'])
+    print("\tCD method = ", method, "\tTest method = ", kwargs["indep_test"])
     possible_methods = ["fci", "ges", "pc", "cdnod", "llm"]
     cols = input_data.columns
 
@@ -126,7 +126,7 @@ def _read_df(path, replaceNan=True, filt_vals=[]):
         df = df.select(filt_vals)
     var = df.to_numpy().var(axis=0)
     print("\tRemoving 0 variance parameters")
-    keep_cols = np.array(filt_vals)[var>1e-6]
+    keep_cols = np.array(filt_vals)[var > 1e-6]
     df = df.select(keep_cols)
     var = df.to_numpy().var(axis=0)
     return df, df_cols

@@ -64,7 +64,7 @@ def main(cfg: DictConfig):
     )
 
     print("\tCreating graph...")
-    seed_1 = cfg['model']['seed'][0]
+    seed_1 = cfg["model"]["seed"][0]
     pyg = _generate_pyg(
         rna_data=rna_df,
         prot_data=prot_df,
@@ -80,7 +80,7 @@ def main(cfg: DictConfig):
         rna_causal_method=cfg.causal.rna_method,
         prot_causal_method=cfg.causal.prot_method,
         seed=seed_1,
-        device=cfg.model.get("device", "cpu")
+        device=cfg.model.get("device", "cpu"),
     )
 
     pyg_copy = copy.deepcopy(pyg)

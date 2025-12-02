@@ -6,6 +6,24 @@ import torch
 from MultiLayerHuman import MultiLayerHuman
 from tqdm import tqdm
 from torch_geometric import seed_everything
+from torch_geometric.utils import dropout_edge
+
+
+def drop_edges(inp_graph, p=0.5):
+    pyg = inp_graph.clone()
+    pyg["rna", "links", "rna"].edge_index = dropout_edge(
+        inp_graph["rna", "links", "rna"].edge_index, p=p
+    )[0]
+    pyg["protein", "interacts", "protein"].edge_index = dropout_edge(
+        inp_graph["protein", "interacts", "protein"].edge_index, p=p
+    )[0]
+    pyg["rna", "synth", "protein"].edge_index = dropout_edge(
+        inp_graph["rna", "synth", "protein"].edge_index, p=p
+    )[0]
+    pyg["protein", "prod", "metabolite"].edge_index = dropout_edge(
+        inp_graph["protein", "prod", "metabolite"].edge_index, p=p
+    )[0]
+    return pyg
 
 
 def _trainGNN(pyg, **kwargs):
@@ -34,7 +52,7 @@ def _trainGNN(pyg, **kwargs):
 
     for i in range(n_runs):
         print("\tRun No. = ", i + 1)
-        seed_everything(kwargs['config']['model']['seed'][i])
+        seed_everything(kwargs["config"]["model"]["seed"][i])
         model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -60,8 +78,22 @@ def _trainGNN(pyg, **kwargs):
         min_val_loss = sys.maxsize
 
         for _ in tqdm(range(kwargs["epochs"])):
+            model.train()
+
+            # Re-create noise of intermediate nodes
+            pyg["protein"].x = torch.randn(
+                pyg["protein"].x.shape[0], pyg["protein"].x.shape[1]
+            )
+            pyg["metabolite"].x = torch.randn(
+                pyg["metabolite"].x.shape[0], pyg["metabolite"].x.shape[1]
+            )
+
+            if kwargs["config"]["model"]["drop_edges"] > 0:
+                pyg_train = drop_edges(pyg, p=kwargs["config"]["model"]["drop_edges"])
+
             optim.zero_grad()
-            out = model(pyg.x_dict, pyg.edge_index_dict)
+            out = model(pyg_train.x_dict, pyg_train.edge_index_dict)
+
             loss1 = loss_fn(
                 out["metabolite"][:, pyg["metabolite"].train_mask],
                 pyg["metabolite"].y[:, pyg["metabolite"].train_mask],
@@ -77,15 +109,16 @@ def _trainGNN(pyg, **kwargs):
 
             loss_comb.backward()
             optim.step()
-            scheduler.step(loss_comb)
 
+            model.eval()
             with torch.no_grad():
+                out_val = model(pyg.x_dict, pyg.edge_index_dict)
                 loss1_val = loss_fn(
-                    out["metabolite"][:, pyg["metabolite"].test_mask],
+                    out_val["metabolite"][:, pyg["metabolite"].test_mask],
                     pyg["metabolite"].y[:, pyg["metabolite"].test_mask],
                 )
                 loss2_val = loss_fn(
-                    out["protein"][:, pyg["protein"].test_mask],
+                    out_val["protein"][:, pyg["protein"].test_mask],
                     pyg["protein"].y[:, pyg["protein"].test_mask],
                 )
 
@@ -93,6 +126,7 @@ def _trainGNN(pyg, **kwargs):
                     kwargs["config"]["model"]["metab_loss"] * loss1_val
                     + kwargs["config"]["model"]["prot_loss"] * loss2_val
                 )
+            scheduler.step(loss_comb_val)
 
             if loss_comb_val < min_val_loss:
                 best_model_weight = model.state_dict()
@@ -127,10 +161,12 @@ def _trainGNN(pyg, **kwargs):
                 "comb": losses_val,
             },
             "loss_train": {"prot": losses_prot, "metab": losses_metab, "comb": losses},
-            "lrs":lrs,
+            "lrs": lrs,
             "timestamp": _timestamp,
             "config": kwargs["config"],
-            "name": time.time() if kwargs["config"]["name"] is None else kwargs["config"]["name"],
+            "name": time.time()
+            if kwargs["config"]["name"] is None
+            else kwargs["config"]["name"],
         }
 
         log_path = os.path.join(
