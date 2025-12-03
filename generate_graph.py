@@ -6,7 +6,7 @@ import os
 from torch_geometric.data import HeteroData
 from torch_geometric import EdgeIndex
 import torch
-from utils import _read_file, _save_file
+from utils import _read_file, _save_file, z_score_norm, min_max_norm
 
 
 def process_ppi_data(inp):
@@ -262,22 +262,26 @@ def _generate_pyg(
 
     pyg = HeteroData()
 
-    pyg["rna"].x = torch.nn.functional.normalize(torch.FloatTensor(rna_inp.T), dim=1)
+    # pyg["rna"].x = torch.nn.functional.normalize(torch.FloatTensor(rna_inp.T), dim=1)
+    pyg["rna"].x = z_score_norm(torch.FloatTensor(rna_inp.T), axis=0)
     pyg["rna"].train_mask = train_mask
     pyg["rna"].test_mask = test_mask
 
     pyg["protein"].x = torch.randn(prot_inp.shape[1], prot_inp.shape[0])
-    pyg["protein"].y = torch.nn.functional.normalize(
-        torch.FloatTensor(prot_inp.T), dim=1
-    )
+    # pyg["protein"].y = torch.nn.functional.normalize(
+    #     torch.FloatTensor(prot_inp.T), dim=1
+    # )
+    pyg["protein"].y = z_score_norm(torch.FloatTensor(prot_inp.T), axis=0)
 
     pyg["protein"].train_mask = train_mask
     pyg["protein"].test_mask = test_mask
 
     pyg["metabolite"].x = torch.randn(metab_inp.shape[1], metab_inp.shape[0])
-    pyg["metabolite"].y = torch.nn.functional.normalize(
-        torch.FloatTensor(metab_inp.T), dim=1
-    )
+    # pyg["metabolite"].y = torch.nn.functional.normalize(
+    #     torch.FloatTensor(metab_inp.T), dim=1
+    # )
+    pyg["metabolite"].y = z_score_norm(torch.FloatTensor(metab_inp.T), axis=0)
+
 
     if torch.isnan(pyg["protein"].y).any():
         pyg["protein"].y = torch.nan_to_num(pyg["protein"].y, nan=0.0)
