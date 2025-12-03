@@ -70,7 +70,7 @@ def get_pathway_mean_sum(metab_vals, metabs):
 def _pathway_analysis(pyg, weight_path, metabs, sample_id, output_dir):
     print("Performing pathway analysis...")
     device = torch.device("cpu")
-    model = MultiLayerHuman(inp_dim=pyg['protein'].x.shape[1]).to(device)
+    model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
 
     model.load_state_dict(torch.load(weight_path, weights_only=True))
     model.eval()
@@ -80,20 +80,20 @@ def _pathway_analysis(pyg, weight_path, metabs, sample_id, output_dir):
     with torch.no_grad():
         out = model(pyg.x_dict, pyg.edge_index_dict)
 
-    x_1 = out['metabolite'][:, sample_id].reshape(1,-1)
-    x_2 = pyg['metabolite'].y[:, sample_id].reshape(1,-1)
-    
+    x_1 = out["metabolite"][:, sample_id].reshape(1, -1)
+    x_2 = pyg["metabolite"].y[:, sample_id].reshape(1, -1)
+
     # x_1 = torch.nn.functional.normalize(x_1, dim=1)
     # x_2 = torch.nn.functional.normalize(x_2, dim=1)
 
     x_1 = z_score_norm(x_1, axis=1)
     x_2 = z_score_norm(x_2, axis=1)
-    
+
     print(torch.mean(x_1[0]), torch.std(x_1[0]))
     print(torch.mean(x_2[0]), torch.std(x_2[0]))
-    
-    plt.plot(x_1[0], label='pred values')
-    plt.plot(x_2[0], label='real values')
+
+    plt.plot(x_1[0], label="pred values")
+    plt.plot(x_2[0], label="real values")
     plt.legend()
     plt.show()
     comp_vals, names = get_pathway_mean_sum(out["metabolite"], metabs)

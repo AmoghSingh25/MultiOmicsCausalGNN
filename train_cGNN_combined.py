@@ -7,7 +7,7 @@ from MultiLayerHuman import MultiLayerHuman
 from tqdm import tqdm
 from torch_geometric import seed_everything
 from torch_geometric.utils import dropout_edge
-from utils import z_score_norm, min_max_norm
+from utils import z_score_norm
 
 
 def drop_edges(inp_graph, p=0.5):
@@ -26,11 +26,12 @@ def drop_edges(inp_graph, p=0.5):
     )[0]
     return pyg
 
+
 def normalize_output(input_graph):
     # input_graph['metabolite'] = torch.nn.functional.normalize(torch.FloatTensor(input_graph['metabolite']), dim=1)
     # input_graph['protein'] = torch.nn.functional.normalize(torch.FloatTensor(input_graph['protein']), dim=1)
-    input_graph['metabolite'] = z_score_norm(input_graph['metabolite'], axis=0)
-    input_graph['protein'] = z_score_norm(input_graph['protein'], axis=0)
+    input_graph["metabolite"] = z_score_norm(input_graph["metabolite"], axis=0)
+    input_graph["protein"] = z_score_norm(input_graph["protein"], axis=0)
     return input_graph
 
 

@@ -6,7 +6,7 @@ import os
 from torch_geometric.data import HeteroData
 from torch_geometric import EdgeIndex
 import torch
-from utils import _read_file, _save_file, z_score_norm, min_max_norm
+from utils import _read_file, _save_file, z_score_norm
 
 
 def process_ppi_data(inp):
@@ -281,7 +281,6 @@ def _generate_pyg(
     #     torch.FloatTensor(metab_inp.T), dim=1
     # )
     pyg["metabolite"].y = z_score_norm(torch.FloatTensor(metab_inp.T), axis=0)
-
 
     if torch.isnan(pyg["protein"].y).any():
         pyg["protein"].y = torch.nan_to_num(pyg["protein"].y, nan=0.0)

@@ -14,7 +14,9 @@ class MultiLayerHuman(torch.nn.Module):
         )
 
         self.lin3 = HeteroDictLinear(
-            in_channels=128, out_channels=inp_dim, types=["rna", "protein", "metabolite"]
+            in_channels=128,
+            out_channels=inp_dim,
+            types=["rna", "protein", "metabolite"],
         )
 
         self.norm1 = torch.nn.LayerNorm(64)
