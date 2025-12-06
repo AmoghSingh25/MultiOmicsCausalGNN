@@ -13,7 +13,7 @@ from sklearn.preprocessing import StandardScaler
 def _run_causal_discovery(input_data, all_vals, method="pc", **kwargs):
     # Input data is a Dataframe with columns containing names of the features - proteins, metabolites, RNAs
     # Rows are samples
-    print("\tCD method = ", method)
+    print("\tCD method = ", method, "\tTest method = ", kwargs["indep_test"])
     possible_methods = ["fci", "ges", "pc", "cdnod", "llm"]
     cols = input_data.columns
 
@@ -50,7 +50,6 @@ def _run_causal_discovery(input_data, all_vals, method="pc", **kwargs):
     undirected_edges = []
     directed_edges = []
     edge_idxs = np.where(ret > 0)
-    print(edge_idxs)
     sub_vals = input_data.columns
     for i in range(len(edge_idxs[0])):
         edge_i = (sub_vals[edge_idxs[0][i]], sub_vals[edge_idxs[1][i]])
@@ -113,8 +112,10 @@ def _read_df(path, replaceNan=True, filt_vals=[]):
     df = df.select(sorted(df.columns[1:])).select(pl.all().cast(pl.Float64))
     df_cols = df.columns
     if replaceNan:
+        print("\tReplacing NaNs and Nulls")
         df = df.fill_nan(0).fill_null(0)
     else:
+        print("\tDropping NaNs and Nulls")
         df = df.drop_nans().drop_nulls()
     filt_vals = set(filt_vals).intersection(
         set(df.columns)
@@ -123,6 +124,11 @@ def _read_df(path, replaceNan=True, filt_vals=[]):
     filt_vals.sort()
     if len(filt_vals) > 0:
         df = df.select(filt_vals)
+    var = df.to_numpy().var(axis=0)
+    print("\tRemoving 0 variance parameters")
+    keep_cols = np.array(filt_vals)[var > 1e-6]
+    df = df.select(keep_cols)
+    var = df.to_numpy().var(axis=0)
     return df, df_cols
 
 
@@ -177,7 +183,7 @@ def main(cfg: DictConfig):
 
     rna_df, rna_vals = _read_df(
         os.path.join(os.path.dirname(os.path.realpath(__file__)), cfg.data.rna_data),
-        replaceNan=cfg.causal.replaceNan,
+        replaceNan=cfg.causal.replaceNanRNA,
         filt_vals=rna_filt,  # RNA IDs that must be kept for causal detection, others will be removed
     )
     print("\tProcessed RNA shape - ", rna_df.shape)
@@ -222,7 +228,7 @@ def main(cfg: DictConfig):
 
     prot_df, prot_vals = _read_df(
         os.path.join(os.path.dirname(os.path.realpath(__file__)), cfg.data.prot_data),
-        replaceNan=cfg.causal.replaceNan,
+        replaceNan=cfg.causal.replaceNanProt,
         filt_vals=prot_filt,  # Protein IDs that must be kept for causal detection, others will be removed
     )
 
@@ -231,7 +237,7 @@ def main(cfg: DictConfig):
         input_data=prot_df,
         method=cfg.causal.prot_method,
         all_vals=prot_vals,
-        indep_test=cfg.causal.rna_indep_test,
+        indep_test=cfg.causal.prot_indep_test,
         cache_path=os.path.join(cache_dir, f"prot_cd_{cfg.causal.prot_method}.json"),
         llm_objective=cfg.causal.llm.get("objective", None),
         llm_model_id=cfg.causal.llm.get("model_id", None),

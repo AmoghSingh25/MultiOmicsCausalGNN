@@ -11,18 +11,11 @@ def _():
 
     sys.path.append(os.path.abspath("."))
 
-    from utils import _read_file
     import os
     import json
     import numpy as np
-    import matplotlib.pyplot as plt
+
     return json, np, os
-
-
-@app.cell
-def _(os):
-    filt_dirs = [x for x in os.listdir("output/") if x.startswith("rcc_")]
-    return
 
 
 @app.cell
@@ -42,8 +35,7 @@ def _(json, logs_files):
         with open("output/logs/" + i) as f:
             json_i = json.load(f)
         name_i = json_i["name"]
-        if len(json_i["loss_val"]["prot"]) != 1000:
-            continue
+        print(name_i)
         if file_run_mapping.get(timestamp) is None:
             file_run_mapping[timestamp] = [name_i]
         else:
@@ -78,11 +70,8 @@ def _(np):
         def stat_loss(arr):
             return np.min(arr), np.mean(arr)
 
-        prot_train_loss = []  # Min, Average
-        metab_train_loss = []  # Min, Average
-        prot_test_loss = []  # Min, Average
-        metab_test_loss = []  # Min, Average
         print(stat_loss(inp["loss_val"]["prot"]))
+
     return
 
 
@@ -94,6 +83,7 @@ def _(file_run_mapping, json, np, working_timestamps):
         metab_train_losses = []
         metab_test_losses = []
         comb_test_losses = []
+        print("Time stamp = ", _i)
         print("Config type = ", file_run_mapping[_i])
 
         for _j in range(5):
@@ -123,7 +113,37 @@ def _(file_run_mapping, json, np, working_timestamps):
         _print_stats("Metab train - ", metab_train_losses)
         _print_stats("Metab test - ", metab_test_losses)
         _print_stats("Comb test - ", comb_test_losses)
+        print(comb_test_losses)
         print("\n\n")
+    return
+
+
+@app.cell
+def _():
+    len(str(2**30))
+    return
+
+
+@app.cell
+def _():
+    len(str(2**32))
+    return
+
+
+@app.cell
+def _():
+    import random
+
+    seeds_test = []
+    for _ in range(5):
+        seeds_test.append(random.randint(2**30, 2**32 - 1))
+    for _i in seeds_test:
+        print(_i)
+    return
+
+
+@app.cell
+def _():
     return
 
 

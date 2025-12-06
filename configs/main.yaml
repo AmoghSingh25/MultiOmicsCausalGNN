@@ -1,19 +1,24 @@
 ---
 name: base_default
+description: Base config description
+eval: false
+debug: true
 model:
   train: true
   epochs: 5
   train_test_ratio: 0.7
+  train_single_sample: false
   save_file: saved_weights.pt
   runs: 1
   prot_loss: 0
   metab_loss : 1
+  drop_edges: 0.5
 data:
   dir: Data/
   org_name: human
   random_edges: false
-  n_random_edges_rna: 20
-  n_random_edges_prot: 10
+  n_random_edges_rna: 162
+  n_random_edges_prot: 231
   predefined_network: false
   use_ppi_network: true
   use_causal_edges: true
@@ -23,11 +28,13 @@ data:
   prot_data: Data/input_data/prot_df.csv
   base_network_file: human_base_network.graphml
 causal:
+  alpha: 0.05
   rna_method: ges
-  prot_method: fci
+  prot_method: ges
   rna_indep_test: mv_fisherz
   prot_indep_test: mv_fisherz
-  replaceNan: true
+  replaceNanRNA: false
+  replaceNanProt: true
   rna_keep:
   prot_keep:
   llm:

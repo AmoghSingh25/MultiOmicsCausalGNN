@@ -14,6 +14,8 @@ RNA data should use Official Gene Symbols as columns
 Protein data should use UniProt Protein IDs as columns
 Metabolite data should use KEGG IDs as columns
 
+config.data.dir + "gene-prot-mapping.tsv" - Contains the gene and the protein they encode downloaded from UniProt ID Mapping
+
 ## Setup
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager before running the setup

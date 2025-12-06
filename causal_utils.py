@@ -4,7 +4,7 @@ from causallearn.search.ConstraintBased.FCI import fci
 from causallearn.search.ConstraintBased.CDNOD import cdnod
 
 
-def run_fci(input_data, cache_path=None, indep_test="gsq", bg=None, **kwargs):
+def run_fci(input_data, cache_path=None, indep_test="kci", bg=None, **kwargs):
     labels = [f"{col}" for i, col in enumerate(input_data.columns)]
     data = input_data.to_numpy()
     print("\tCache path = ", cache_path)
@@ -18,7 +18,7 @@ def run_fci(input_data, cache_path=None, indep_test="gsq", bg=None, **kwargs):
     return g, labels
 
 
-def run_pc(input_data, cache_path=None, indep_test="gsq", bg=None, **kwargs):
+def run_pc(input_data, cache_path=None, indep_test="kci", bg=None, **kwargs):
     print("\tCache path = ", cache_path)
     labels = [f"{col}" for i, col in enumerate(input_data.columns)]
     data = input_data.to_numpy().astype("float32")

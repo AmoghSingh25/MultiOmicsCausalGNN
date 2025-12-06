@@ -1,6 +1,6 @@
----
+# @package _global_
 defaults:
-  - /main
+  - ../main@_global_
   - _self_
 name: glioblastoma_omics
 model:
@@ -9,13 +9,13 @@ data:
   predefined_network: false
   use_causal_edges: true
   significant_ppi: false
-  rna_data: Data/input_data/KidneyTumorData/frmt_transcriptomics.csv
-  metab_data: Data/input_data/KidneyTumorData/frmt_metabolomics.csv
-  prot_data: Data/input_data/KidneyTumorData/frmt_proteomics.csv
+  rna_data: Data/input_data/data2/frmt_transcriptomics.csv
+  metab_data: Data/input_data/data2/frmt_metabolomics.csv
+  prot_data: Data/input_data/data2/frmt_proteomics.csv
   base_network_file: human_base_network_2.graphml
 causal:
-  filt_rna: Data/input_data/KidneyTumorData/renal_cancer_gene_filt.txt
-  filt_prot: Data/input_data/KidneyTumorData/renal_cancer_prot_filt.txt
+  filt_rna: Data/input_data/data2/renal_cancer_gene_filt.txt
+  filt_prot: Data/input_data/data2/renal_cancer_prot_filt.txt
   alpha: 0.1
   llm:
     objective: orient

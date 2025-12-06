@@ -3,10 +3,10 @@ defaults:
   - ./rcc@_global_
   - _self_
 name: rcc_bn9
-description: Causal links by Gemma
+description: No R-R or P-P links, only base network
 data:
   predefined_network: false
-  use_causal_edges: true
+  use_causal_edges: false
   significant_ppi: false
   use_ppi_network: false
 causal:
