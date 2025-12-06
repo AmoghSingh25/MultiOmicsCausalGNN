@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import networkx as nx
-from utils import _read_file, z_score_norm
+from utils import _read_file
 from omicsGraphDataset import OmicGraphDataset
 
 warnings.filterwarnings("ignore")
@@ -67,36 +67,19 @@ def get_pathway_mean_sum(metab_vals, metabs):
     return comp_vals, names
 
 
-def _pathway_analysis(pyg, weight_path, metabs, sample_id, output_dir):
+def _pathway_analysis(pyg, weight_path, metabs, sample_id, output_dir, device):
     print("Performing pathway analysis...")
-    device = torch.device("cpu")
     model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
-
     model.load_state_dict(torch.load(weight_path, weights_only=True))
     model.eval()
-    # dataset = OmicGraphDataset(pyg, mask=False, drop_edges=False)
-    # sample_data = dataset.get(sample_id)
+
     pyg.to(device)
     with torch.no_grad():
         out = model(pyg.x_dict, pyg.edge_index_dict)
 
-    x_1 = out["metabolite"][:, sample_id].reshape(1, -1)
-    x_2 = pyg["metabolite"].y[:, sample_id].reshape(1, -1)
+    x_1 = out["metabolite"][:, sample_id].cpu().detach().reshape(-1)
 
-    # x_1 = torch.nn.functional.normalize(x_1, dim=1)
-    # x_2 = torch.nn.functional.normalize(x_2, dim=1)
-
-    x_1 = z_score_norm(x_1, axis=1)
-    x_2 = z_score_norm(x_2, axis=1)
-
-    print(torch.mean(x_1[0]), torch.std(x_1[0]))
-    print(torch.mean(x_2[0]), torch.std(x_2[0]))
-
-    plt.plot(x_1[0], label="pred values")
-    plt.plot(x_2[0], label="real values")
-    plt.legend()
-    plt.show()
-    comp_vals, names = get_pathway_mean_sum(out["metabolite"], metabs)
+    comp_vals, names = get_pathway_mean_sum(x_1, metabs)
 
     abs_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), output_dir, "figures"
@@ -127,8 +110,8 @@ def _single_sample_inference(
     with torch.no_grad():
         out = model(sample_data.x_dict, sample_data.edge_index_dict)
 
-    metab_init = out["metabolite"]
-    prot_init = out["protein"]
+    metab_init = out["metabolite"].cpu().detach()
+    prot_init = out["protein"].cpu().detach()
 
     for i in prot_indices:
         sample_data["protein"].x[i] = sample_data["protein"].x[i] * intervention_mult
@@ -139,8 +122,8 @@ def _single_sample_inference(
     with torch.no_grad():
         out = model(sample_data.x_dict, sample_data.edge_index_dict)
 
-    protein_new = out["protein"]
-    metab_new = out["metabolite"]
+    protein_new = out["protein"].cpu().detach()
+    metab_new = out["metabolite"].cpu().detach()
     return prot_init, metab_init, protein_new, metab_new
 
 
@@ -160,8 +143,8 @@ def _comb_sample_inference(
     with torch.no_grad():
         out = model(pyg.x_dict, pyg.edge_index_dict)
 
-    metab_init = out["metabolite"][:, intervention_sample]
-    prot_init = out["protein"][:, intervention_sample]
+    metab_init = out["metabolite"][:, intervention_sample].cpu().detach()
+    prot_init = out["protein"][:, intervention_sample].cpu().detach()
 
     for i in prot_indices:
         pyg["protein"].x[i, intervention_sample] = (
@@ -176,8 +159,8 @@ def _comb_sample_inference(
     with torch.no_grad():
         out = model(pyg.x_dict, pyg.edge_index_dict)
 
-    protein_new = out["protein"][:, intervention_sample]
-    metab_new = out["metabolite"][:, intervention_sample]
+    protein_new = out["protein"][:, intervention_sample].cpu().detach()
+    metab_new = out["metabolite"][:, intervention_sample].cpu().detach()
     return prot_init, metab_init, protein_new, metab_new
 
 
@@ -193,12 +176,13 @@ def _intervention_analysis(
     output_dir,
     single_sample_model=False,
     device="cpu",
+    debug=False,
 ):
-    print("Performing intervention analysis...")
+    debug and print("Performing intervention analysis...")
     metab_pathway = set()
     abs_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "Data")
 
-    print("\tReading network file ...")
+    debug and print("\tReading network file ...")
     metab_pathways = _read_file(os.path.join(abs_path, "human_metab_pathway_t.pkl"))
 
     g = nx.read_graphml(os.path.join(abs_path, "human_base_network.graphml"))
@@ -210,7 +194,7 @@ def _intervention_analysis(
     prot_interest = set()
     prot_indices = set()
 
-    print("\tIdentifying connected proteins ...")
+    debug and print("\tIdentifying connected proteins ...")
 
     for i in tqdm(g.edges):
         if i[0] in metab_pathway and i[1] in prots_l:
@@ -220,7 +204,7 @@ def _intervention_analysis(
             prot_interest.add(i[0])
             prot_indices.add(prots_l.index(i[0]))
 
-    print("\tIdentifying connected RNAs ...")
+    debug and print("\tIdentifying connected RNAs ...")
     prot_interest = list(prot_interest)
     prot_indices = list(prot_indices)
     rna_indices = set()
@@ -311,7 +295,7 @@ def _intervention_analysis(
         os.path.join(fig_path, "rel_activity_post_intervention.png"),
         plot_type="rel",
     )
-    print("\tIntervention analysis plots saved")
+    debug and print("\tIntervention analysis plots saved")
 
 
 def _save_pathway_diff_fig(bef_val, aft_val, pathways, path, t="total"):

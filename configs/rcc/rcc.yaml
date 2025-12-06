@@ -3,6 +3,7 @@ defaults:
   - ../main@_global_
 name: rcc
 description: Base RCC description
+debug: true
 model:
   epochs: 1000
   train_test_ratio: 0.7
@@ -12,13 +13,19 @@ model:
   prot_loss: 0.6
   metab_loss : 0.4
   device: mps
-  drop_edges: 0.5
+  drop_edges: 0.6
   seed:
     - 2729424255
     - 3683917037
     - 2667104789
     - 2821685283
     - 4015210798
+  test_seed:
+    - 2400659785
+    - 1868133369
+    - 2767043706
+    - 1090722318
+    - 1872802580
 data:
   dir: Data/input_data/KidneyTumorData
   predefined_network: false

@@ -55,13 +55,16 @@ def check_repeat_element_edges(arr):
     return dup_edges
 
 
-def generate_random_edges(vals, req_shape):
+def generate_random_edges(vals, req_shape, seed=None):
+    np.random.seed(seed)
     random_edges = np.random.choice(list(range(len(vals))), size=req_shape)
     dup_edges = check_repeat_element_edges(random_edges)
     while len(dup_edges) > 0:
         random_edges = np.delete(random_edges, dup_edges, axis=0)
         random_edges = np.append(
-            random_edges, np.random.choice(vals, size=(len(dup_edges), 2)), axis=0
+            random_edges,
+            np.random.choice(list(range(len(vals))), size=(len(dup_edges), 2)),
+            axis=0,
         )
         dup_edges = check_repeat_element_edges(random_edges)
     return random_edges
@@ -80,6 +83,7 @@ def _generate_graph(
     output_dir,
     rna_causal_method,
     prot_causal_method,
+    seed=None,
 ):
     abs_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), output_dir, "network"
@@ -87,16 +91,11 @@ def _generate_graph(
     rna_vals_temp = list(rna_df.columns)[1:]
     prot_vals_temp = list(prot_df.columns)[1:]
     metab_vals_temp = list(metab_df.columns)[1:]
-    prot_set_comp = set()
+    prot_vals_dict = {}
     for i in range(len(prot_vals_temp)):
         prot_vals_temp[i] = prot_vals_temp[i].split(";")
-        prot_set_comp.update(prot_vals_temp[i])
-
-    def search_in_prot(search_term):
-        for i in range(len(prot_vals_temp)):
-            if search_term in prot_vals_temp[i]:
-                return i
-        return -1
+        for prot in prot_vals_temp[i]:
+            prot_vals_dict[prot] = i
 
     rna_vals_dict = {rna_vals_temp[i]: i for i in range(len(rna_vals_temp))}
     metab_vals_dict = {metab_vals_temp[i]: i for i in range(len(metab_vals_temp))}
@@ -109,13 +108,16 @@ def _generate_graph(
     random_rna_edges = []
     random_prot_edges = []
 
+    causal_pp_edges = []
+    causal_rr_edges = []
+
     if random_edges:
         print("\tGenerating and adding in random edges")
         random_rna_edges = generate_random_edges(
-            rna_df.columns, req_shape=(n_random_edges_rna, 2)
+            rna_df.columns, req_shape=(n_random_edges_rna, 2), seed=seed
         )
         random_prot_edges = generate_random_edges(
-            list(prot_set_comp), req_shape=(n_random_edges_prot, 2)
+            prot_df.columns, req_shape=(n_random_edges_prot, 2), seed=seed
         )
 
     if use_causal_edges:
@@ -123,16 +125,18 @@ def _generate_graph(
             os.path.join(abs_path, prot_causal_method + "_pp_causal_edges.pkl")
         ):
             print("Causal protein-protein edges found, adding in edges...")
-            pp_edges = _read_file(
+            causal_pp_edges = _read_file(
                 os.path.join(abs_path, prot_causal_method + "_pp_causal_edges.pkl")
             )
+            causal_pp_edges = [(x[1], x[0]) for x in causal_pp_edges]
         if os.path.exists(
             os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl")
         ):
             print("Causal RNA-RNA edges found, adding in edges...")
-            rr_edges = _read_file(
+            causal_rr_edges = _read_file(
                 os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl")
             )
+            causal_rr_edges = [(x[1], x[0]) for x in causal_rr_edges]
         else:
             print("Causal edges files not found... Continuing with base network")
 
@@ -153,6 +157,10 @@ def _generate_graph(
             rr_e = np.append(rr_edges, rr_e, axis=0)
         if len(pp_edges) > 0:
             pp_e = np.append(pp_edges, pp_e, axis=0)
+        rr_e = np.unique(rr_e, axis=0)
+        pp_e = np.unique(pp_e, axis=0)
+        rp_e = np.unique(rp_e, axis=0)
+        pm_e = np.unique(pm_e, axis=0)
         return rr_e, rp_e, pp_e, pm_e
 
     print(
@@ -163,34 +171,40 @@ def _generate_graph(
         if i[0] in rna_vals_dict:
             if i[1] in rna_vals_dict:  # RNA-RNA
                 rr_edges.append((rna_vals_dict[i[0]], rna_vals_dict[i[1]]))
-            elif i[1] in prot_set_comp:  # RNA-Protein
-                idx = search_in_prot(i[1])
-                if idx is not None:
-                    rp_edges.append((rna_vals_dict[i[0]], search_in_prot(i[1])))
+                rr_edges.append((rna_vals_dict[i[1]], rna_vals_dict[i[0]]))
+            elif i[1] in prot_vals_dict:  # RNA-Protein
+                if i[1] in prot_vals_dict:
+                    rp_edges.append((rna_vals_dict[i[0]], prot_vals_dict[i[1]]))
         else:
-            prot_idx_i = search_in_prot(i[0])
-            if prot_idx_i == -1:
+            if i[0] not in prot_vals_dict:
                 if i[0] in metab_vals_dict:  # Protein-Metabolite
-                    prot_idx_i = search_in_prot(i[1])
-                    if prot_idx_i == -1:  # Metabolite-Pathway edge, skips...
+                    if i[1] not in prot_vals_dict:  # Metabolite-Pathway edge, skips...
                         continue
-                    pm_edges.append((prot_idx_i, metab_vals_dict[i[0]]))
+                    pm_edges.append((prot_vals_dict[i[1]], metab_vals_dict[i[0]]))
             else:
-                if i[1] in prot_set_comp:  # Protein-Protein
-                    pp_edges.append((prot_idx_i, search_in_prot(i[1])))
+                if i[1] in prot_vals_dict:  # Protein-Protein
+                    pp_edges.append((prot_vals_dict[i[0]], prot_vals_dict[i[1]]))
+                    pp_edges.append((prot_vals_dict[i[1]], prot_vals_dict[i[0]]))
                 elif i[1] in metab_vals_dict:  # Protein-Metabolite
-                    pm_edges.append((prot_idx_i, metab_vals_dict[i[1]]))
+                    pm_edges.append((prot_vals_dict[i[0]], metab_vals_dict[i[1]]))
                 elif i[1] in rna_vals_dict:  # RNA-Protein
-                    idx = search_in_prot(i[0])
-                    if idx is not None:
-                        rp_edges.append((rna_vals_dict[i[1]], search_in_prot(i[0])))
+                    if i[0] in prot_vals_dict:
+                        rp_edges.append((rna_vals_dict[i[1]], prot_vals_dict[i[0]]))
+
     rr_edges = np.array(rr_edges).astype(int).reshape((-1, 2))
     rp_edges = np.array(rp_edges).astype(int).reshape((-1, 2))
     pp_edges = np.array(pp_edges).astype(int).reshape((-1, 2))
     pm_edges = np.array(pm_edges).astype(int).reshape((-1, 2))
     if random_edges:
-        rr_edges = np.append(rr_edges, random_rna_edges, axis=0)
-        pp_edges = np.append(pp_edges, random_prot_edges, axis=0)
+        rr_edges = np.append(rr_edges, np.array(random_rna_edges), axis=0)
+        pp_edges = np.append(pp_edges, np.array(random_prot_edges), axis=0)
+    if use_causal_edges:
+        rr_edges = np.append(rr_edges, np.array(causal_rr_edges), axis=0)
+        pp_edges = np.append(pp_edges, np.array(causal_pp_edges), axis=0)
+    rr_edges = np.unique(rr_edges, axis=0)
+    pp_edges = np.unique(pp_edges, axis=0)
+    rp_edges = np.unique(rp_edges, axis=0)
+    pm_edges = np.unique(pm_edges, axis=0)
     _save_file(os.path.join(abs_path, "rr_edges.pkl"), rr_edges)
     _save_file(os.path.join(abs_path, "rp_edges.pkl"), rp_edges)
     _save_file(os.path.join(abs_path, "pp_edges.pkl"), pp_edges)
@@ -214,6 +228,7 @@ def _generate_pyg(
     prot_causal_method="fci",
     seed=None,
     device="cpu",
+    debug=False,
 ):
     assert (
         rna_data.shape[0] == prot_data.shape[0]
@@ -222,6 +237,10 @@ def _generate_pyg(
     assert train_test_ratio > 0 and train_test_ratio <= 1, (
         "Train-test ratio out of bounds (0<r<=1)"
     )
+
+    if type(seed) is list:
+        seed = seed[0]
+
     device = torch.device(device)
     np.random.seed(seed)
 
@@ -238,6 +257,7 @@ def _generate_pyg(
         output_dir=output_dir,
         rna_causal_method=rna_causal_method,
         prot_causal_method=prot_causal_method,
+        seed=seed,
     )
 
     train_size = int(train_test_ratio * rna_data.shape[0])
@@ -248,16 +268,16 @@ def _generate_pyg(
     train_mask = train_mask.astype(bool)
     test_mask = test_mask.astype(bool)
 
-    prot_inp = np.array(prot_data)
-    prot_inp = np.nan_to_num(prot_inp, 0)
+    prot_inp = np.array(prot_data).astype(np.float64)
+    prot_inp = np.nan_to_num(prot_inp, 0.0)
     prot_inp = prot_inp[:, 1:].astype(np.float64)
 
-    metab_inp = np.array(metab_data)
-    metab_inp = np.nan_to_num(metab_inp, 0)
+    metab_inp = np.array(metab_data).astype(np.float64)
+    metab_inp = np.nan_to_num(metab_inp, 0.0)
     metab_inp = metab_inp[:, 1:].astype(np.float64)
 
-    rna_inp = np.array(rna_data)
-    rna_inp = np.nan_to_num(rna_inp, 0)
+    rna_inp = np.array(rna_data).astype(np.float64)
+    rna_inp = np.nan_to_num(rna_inp, 0.0)
     rna_inp = rna_inp[:, 1:].astype(np.float64)
 
     pyg = HeteroData()
@@ -268,19 +288,20 @@ def _generate_pyg(
     pyg["rna"].test_mask = test_mask
 
     pyg["protein"].x = torch.randn(prot_inp.shape[1], prot_inp.shape[0])
+    pyg["protein"].y = z_score_norm(torch.FloatTensor(prot_inp.T), axis=0)
+
     # pyg["protein"].y = torch.nn.functional.normalize(
     #     torch.FloatTensor(prot_inp.T), dim=1
     # )
-    pyg["protein"].y = z_score_norm(torch.FloatTensor(prot_inp.T), axis=0)
 
     pyg["protein"].train_mask = train_mask
     pyg["protein"].test_mask = test_mask
 
     pyg["metabolite"].x = torch.randn(metab_inp.shape[1], metab_inp.shape[0])
+    pyg["metabolite"].y = z_score_norm(torch.FloatTensor(metab_inp.T), axis=0)
     # pyg["metabolite"].y = torch.nn.functional.normalize(
     #     torch.FloatTensor(metab_inp.T), dim=1
     # )
-    pyg["metabolite"].y = z_score_norm(torch.FloatTensor(metab_inp.T), axis=0)
 
     if torch.isnan(pyg["protein"].y).any():
         pyg["protein"].y = torch.nan_to_num(pyg["protein"].y, nan=0.0)
@@ -309,22 +330,162 @@ def _generate_pyg(
         pm_edges_t, is_undirected=False
     )
 
-    print(
+    debug and print(
         f"\t RNA-RNA edges = {pyg['rna', 'links', 'rna'].num_edges}. Directed - {pyg['rna', 'links', 'rna'].num_edges == rr_edges_t.shape[1]}\t\t",
     )
-    print(
+    debug and print(
         f"\t Protein-Protein edges = {pyg['protein', 'interacts', 'protein'].num_edges}. Directed - {pyg['protein', 'interacts', 'protein'].num_edges == pp_edges_t.shape[1]}\t\t",
     )
-    print(
+    debug and print(
         f"\t RNA-Protein edges = {pyg['rna', 'synth', 'protein'].num_edges}. Directed - {pyg['rna', 'synth', 'protein'].num_edges == pr_edges_t.shape[1]}\t\t",
     )
-    print(
+    debug and print(
         f"\t Protein-Metabolite edges = {pyg['protein', 'prod', 'metabolite'].num_edges}. Directed - {pyg['protein', 'prod', 'metabolite'].num_edges == pm_edges_t.shape[1]}\t\t",
     )
 
     pyg.requires_grad_("rna", requires_grad=True)
     pyg.requires_grad_("metabolite", requires_grad=True)
     pyg.requires_grad_("protein", requires_grad=True)
-
     pyg = pyg.to(device)
+    print(pyg)
     return pyg
+
+
+def _generate_multiple_graphs(
+    rna_data,
+    prot_data,
+    metab_data,
+    predefined_network,
+    output_dir,
+    graph_name,
+    random_edges,
+    n_random_edges_rna,
+    n_random_edges_prot,
+    train_test_ratio=0.7,
+    use_causal_edges=False,
+    rna_causal_method="ges",
+    prot_causal_method="fci",
+    seed=None,
+    device="cpu",
+    debug=False,
+):
+    pyg_graphs = []
+    for i in seed:
+        assert (
+            rna_data.shape[0] == prot_data.shape[0]
+            and prot_data.shape[0] == metab_data.shape[0]
+        ), "Irregular sample sizes for omics"
+        assert train_test_ratio > 0 and train_test_ratio <= 1, (
+            "Train-test ratio out of bounds (0<r<=1)"
+        )
+        device = torch.device(device)
+        np.random.seed(i)
+
+        rr_edges, rp_edges, pp_edges, pm_edges = _generate_graph(
+            rna_data,
+            prot_data,
+            metab_data,
+            predefined_network,
+            graph_name,
+            random_edges,
+            n_random_edges_rna,
+            n_random_edges_prot,
+            use_causal_edges=use_causal_edges,
+            output_dir=output_dir,
+            rna_causal_method=rna_causal_method,
+            prot_causal_method=prot_causal_method,
+            seed=i,
+        )
+
+        train_size = int(train_test_ratio * rna_data.shape[0])
+        train_mask = np.zeros(rna_data.shape[0])
+        train_mask[:train_size] = 1
+        np.random.shuffle(train_mask)
+        test_mask = np.abs(1 - train_mask)
+        train_mask = train_mask.astype(bool)
+        test_mask = test_mask.astype(bool)
+
+        prot_inp = np.array(prot_data).astype(np.float64)
+        prot_inp = np.nan_to_num(prot_inp, 0.0)
+        prot_inp = prot_inp[:, 1:].astype(np.float64)
+
+        metab_inp = np.array(metab_data).astype(np.float64)
+        metab_inp = np.nan_to_num(metab_inp, 0.0)
+        metab_inp = metab_inp[:, 1:].astype(np.float64)
+
+        rna_inp = np.array(rna_data).astype(np.float64)
+        rna_inp = np.nan_to_num(rna_inp, 0.0)
+        rna_inp = rna_inp[:, 1:].astype(np.float64)
+
+        pyg = HeteroData()
+
+        # pyg["rna"].x = torch.nn.functional.normalize(torch.FloatTensor(rna_inp.T), dim=1)
+        pyg["rna"].x = z_score_norm(torch.FloatTensor(rna_inp.T), axis=0)
+        pyg["rna"].train_mask = train_mask
+        pyg["rna"].test_mask = test_mask
+
+        pyg["protein"].x = torch.randn(prot_inp.shape[1], prot_inp.shape[0])
+        pyg["protein"].y = z_score_norm(torch.FloatTensor(prot_inp.T), axis=0)
+
+        # pyg["protein"].y = torch.nn.functional.normalize(
+        #     torch.FloatTensor(prot_inp.T), dim=1
+        # )
+
+        pyg["protein"].train_mask = train_mask
+        pyg["protein"].test_mask = test_mask
+
+        pyg["metabolite"].x = torch.randn(metab_inp.shape[1], metab_inp.shape[0])
+        pyg["metabolite"].y = z_score_norm(torch.FloatTensor(metab_inp.T), axis=0)
+        # pyg["metabolite"].y = torch.nn.functional.normalize(
+        #     torch.FloatTensor(metab_inp.T), dim=1
+        # )
+
+        if torch.isnan(pyg["protein"].y).any():
+            pyg["protein"].y = torch.nan_to_num(pyg["protein"].y, nan=0.0)
+        if torch.isnan(pyg["metabolite"].y).any():
+            pyg["metabolite"].y = torch.nan_to_num(pyg["metabolite"].y, nan=0.0)
+
+        pyg["metabolite"].train_mask = train_mask
+        pyg["metabolite"].test_mask = test_mask
+
+        pp_edges = np.array(pp_edges).astype(int)
+        print(pp_edges.shape)
+
+        rr_edges_t = torch.tensor(rr_edges).t().contiguous()
+        pp_edges_t = torch.tensor(pp_edges).t().contiguous()
+        pr_edges_t = torch.tensor(rp_edges).t().contiguous()
+        pm_edges_t = torch.tensor(pm_edges).t().contiguous()
+
+        pyg["rna", "links", "rna"].edge_index = EdgeIndex(
+            rr_edges_t, is_undirected=False
+        )
+        pyg["protein", "interacts", "protein"].edge_index = EdgeIndex(
+            pp_edges_t, is_undirected=False
+        )
+
+        pyg["rna", "synth", "protein"].edge_index = EdgeIndex(
+            pr_edges_t, is_undirected=False
+        )
+        pyg["protein", "prod", "metabolite"].edge_index = EdgeIndex(
+            pm_edges_t, is_undirected=False
+        )
+
+        pyg.requires_grad_("rna", requires_grad=True)
+        pyg.requires_grad_("metabolite", requires_grad=True)
+        pyg.requires_grad_("protein", requires_grad=True)
+
+        pyg = pyg.to(device)
+        pyg_graphs.append(pyg)
+    debug and print(
+        f"\t RNA-RNA edges = {pyg_graphs[0]['rna', 'links', 'rna'].num_edges}. Directed - {pyg_graphs[0]['rna', 'links', 'rna'].num_edges == rr_edges_t.shape[1]}\t\t",
+    )
+    debug and print(
+        f"\t Protein-Protein edges = {pyg_graphs[0]['protein', 'interacts', 'protein'].num_edges}. Directed - {pyg_graphs[0]['protein', 'interacts', 'protein'].num_edges == pp_edges_t.shape[1]}\t\t",
+    )
+    debug and print(
+        f"\t RNA-Protein edges = {pyg_graphs[0]['rna', 'synth', 'protein'].num_edges}. Directed - {pyg_graphs[0]['rna', 'synth', 'protein'].num_edges == pr_edges_t.shape[1]}\t\t",
+    )
+    debug and print(
+        f"\t Protein-Metabolite edges = {pyg_graphs[0]['protein', 'prod', 'metabolite'].num_edges}. Directed - {pyg_graphs[0]['protein', 'prod', 'metabolite'].num_edges == pm_edges_t.shape[1]}\t\t",
+    )
+    return pyg_graphs

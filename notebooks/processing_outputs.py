@@ -20,11 +20,6 @@ def _():
 
 @app.cell
 def _(os):
-    return
-
-
-@app.cell
-def _(os):
     logs_files = [x for x in os.listdir("output/logs/") if x.endswith(".json")]
     logs_files.sort()
     logs_files
@@ -40,8 +35,7 @@ def _(json, logs_files):
         with open("output/logs/" + i) as f:
             json_i = json.load(f)
         name_i = json_i["name"]
-        if len(json_i["loss_val"]["prot"]) != 1000:
-            continue
+        print(name_i)
         if file_run_mapping.get(timestamp) is None:
             file_run_mapping[timestamp] = [name_i]
         else:
@@ -119,7 +113,32 @@ def _(file_run_mapping, json, np, working_timestamps):
         _print_stats("Metab train - ", metab_train_losses)
         _print_stats("Metab test - ", metab_test_losses)
         _print_stats("Comb test - ", comb_test_losses)
+        print(comb_test_losses)
         print("\n\n")
+    return
+
+
+@app.cell
+def _():
+    len(str(2**30))
+    return
+
+
+@app.cell
+def _():
+    len(str(2**32))
+    return
+
+
+@app.cell
+def _():
+    import random
+
+    seeds_test = []
+    for _ in range(5):
+        seeds_test.append(random.randint(2**30, 2**32 - 1))
+    for _i in seeds_test:
+        print(_i)
     return
 
 

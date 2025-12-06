@@ -8,7 +8,7 @@
 
 from train_causalGNN import _trainGNN
 from train_cGNN_combined import _trainGNN as _trainGNN_combined
-from generate_graph import _generate_pyg
+from generate_graph import _generate_pyg, _generate_multiple_graphs
 import polars as pl
 from analysis import _pathway_analysis, _intervention_analysis
 import os
@@ -16,6 +16,7 @@ import copy
 from generate_pathways import _generate_base_network
 import hydra
 from omegaconf import DictConfig, OmegaConf
+from eval_models import get_weight_scores
 
 
 def _create_dirs(cfg):
@@ -37,8 +38,9 @@ def _create_dirs(cfg):
 
 @hydra.main(version_base=None, config_path="configs", config_name="main")
 def main(cfg: DictConfig):
-    print("Configuration - ")
-    print(OmegaConf.to_yaml(cfg))
+    if cfg.debug:
+        print("Configuration - ")
+        print(OmegaConf.to_yaml(cfg))
     output_dir = _create_dirs(cfg)
     rna_df = pl.read_csv(
         os.path.join(os.path.dirname(os.path.realpath(__file__)), cfg.data.rna_data),
@@ -63,30 +65,51 @@ def main(cfg: DictConfig):
         significant_ppi=cfg.data.significant_ppi,
     )
 
-    print("\tCreating graph...")
-    seed_1 = cfg["model"]["seed"][0]
-    pyg = _generate_pyg(
-        rna_data=rna_df,
-        prot_data=prot_df,
-        metab_data=metab_df,
-        predefined_network=cfg.data.predefined_network,
-        output_dir=output_dir,
-        graph_name=cfg.data.get("base_network_file", "human_base_network.graphml"),
-        random_edges=cfg.data.get("random_edges", False),
-        n_random_edges_rna=cfg.data.get("n_random_edges_rna", 0),
-        n_random_edges_prot=cfg.data.get("n_random_edges_prot", 0),
-        train_test_ratio=cfg.model.train_test_ratio,
-        use_causal_edges=cfg.data.use_causal_edges,
-        rna_causal_method=cfg.causal.rna_method,
-        prot_causal_method=cfg.causal.prot_method,
-        seed=seed_1,
-        device=cfg.model.get("device", "cpu"),
-    )
+    cfg.debug and print("\tCreating graph...")
+    if cfg.data.random_edges:
+        print("Generating multiple graphs..")
+        pyg = _generate_multiple_graphs(
+            rna_data=rna_df,
+            prot_data=prot_df,
+            metab_data=metab_df,
+            predefined_network=cfg.data.predefined_network,
+            output_dir=output_dir,
+            graph_name=cfg.data.get("base_network_file", "human_base_network.graphml"),
+            random_edges=cfg.data.get("random_edges", False),
+            n_random_edges_rna=cfg.data.get("n_random_edges_rna", 0),
+            n_random_edges_prot=cfg.data.get("n_random_edges_prot", 0),
+            train_test_ratio=cfg.model.train_test_ratio,
+            use_causal_edges=cfg.data.use_causal_edges,
+            rna_causal_method=cfg.causal.rna_method,
+            prot_causal_method=cfg.causal.prot_method,
+            seed=list(cfg["model"]["seed"]),
+            device=cfg.model.get("device", "cpu"),
+            debug=cfg.debug,
+        )
+    else:
+        pyg = _generate_pyg(
+            rna_data=rna_df,
+            prot_data=prot_df,
+            metab_data=metab_df,
+            predefined_network=cfg.data.predefined_network,
+            output_dir=output_dir,
+            graph_name=cfg.data.get("base_network_file", "human_base_network.graphml"),
+            random_edges=cfg.data.get("random_edges", False),
+            n_random_edges_rna=cfg.data.get("n_random_edges_rna", 0),
+            n_random_edges_prot=cfg.data.get("n_random_edges_prot", 0),
+            train_test_ratio=cfg.model.train_test_ratio,
+            use_causal_edges=cfg.data.use_causal_edges,
+            rna_causal_method=cfg.causal.rna_method,
+            prot_causal_method=cfg.causal.prot_method,
+            seed=list(cfg["model"]["seed"]),
+            device=cfg.model.get("device", "cpu"),
+            debug=cfg.debug,
+        )
 
     pyg_copy = copy.deepcopy(pyg)
     if cfg.model.train:
         if cfg.model.train_single_sample:
-            print("Starting GNN training on single samples...")
+            cfg.debug and print("Starting GNN training on single samples...")
             _trainGNN(
                 pyg,
                 epochs=cfg.model.epochs,
@@ -95,7 +118,7 @@ def main(cfg: DictConfig):
                 config=OmegaConf.to_container(cfg=cfg, resolve=True),
             )
         else:
-            print("Starting GNN training on combined samples...")
+            cfg.debug and print("Starting GNN training on combined samples...")
             _trainGNN_combined(
                 pyg,
                 epochs=cfg.model.epochs,
@@ -110,12 +133,24 @@ def main(cfg: DictConfig):
     parent_dir = os.path.dirname(os.path.realpath(__file__))
     weight_path = os.path.join(parent_dir, output_dir, "weights", cfg.model.save_file)
 
+    if cfg.eval:
+        get_weight_scores(
+            pyg,
+            os.path.join(parent_dir, output_dir),
+            metab_ratio=cfg.model.metab_loss,
+            prot_ratio=cfg.model.prot_loss,
+            seeds=list(cfg.model.test_seed),
+            device=cfg.model.get("device", "cpu"),
+        )
+        return
+
     _pathway_analysis(
         pyg_copy,
         weight_path=weight_path,
         metabs=metabs,
         sample_id=cfg.intervention.sample,
         output_dir=output_dir,
+        device=cfg.model.get("device", "cpu"),
     )
 
     if cfg.intervention.enabled:
@@ -129,6 +164,8 @@ def main(cfg: DictConfig):
             metabs_l=metabs,
             weight_path=weight_path,
             output_dir=output_dir,
+            debug=cfg.debug,
+            device=cfg.model.get("device", "cpu"),
         )
 
 

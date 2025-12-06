@@ -35,7 +35,7 @@ def _trainGNN(pyg, **kwargs):
     global_best_weight = None
 
     for i in range(n_runs):
-        print("\tRun No. = ", i + 1)
+        kwargs["config"]["debug"] and print("\tRun No. = ", i + 1)
 
         seed_everything(kwargs["config"]["model"]["seed"][i])
         train_dataset = OmicGraphDataset(pyg, device=cfg_device)
@@ -53,7 +53,9 @@ def _trainGNN(pyg, **kwargs):
 
         model = model.to(device)
 
-        print("\tModel validation result = ", pyg.validate())
+        kwargs["config"]["debug"] and print(
+            "\tModel validation result = ", pyg.validate()
+        )
 
         best_model_weight = None
         model.train()
@@ -178,9 +180,11 @@ def _trainGNN(pyg, **kwargs):
         with open(log_path, "w") as f:
             json.dump(log_, f)
 
-        print(f"\tTraining Completed. Saved logs at {log_path}")
+        kwargs["config"]["debug"] and print(
+            f"\tTraining Completed. Saved logs at {log_path}"
+        )
     abs_path = os.path.join(
         parent_dir, kwargs["save_dir"], "weights", kwargs["weight_path"]
     )
-    print("Saving global weight at ", abs_path)
+    kwargs["config"]["debug"] and print("Saving global weight at ", abs_path)
     torch.save(global_best_weight, abs_path)

@@ -5,7 +5,7 @@ defaults:
 name: rcc_bn3
 description: DAVID clustering links
 data:
-  predefined_network: false
+  predefined_network: true
   use_causal_edges: true
   significant_ppi: false
   use_ppi_network: false

@@ -38,6 +38,7 @@ def _generate_base_network(
     use_ppi=False,
     org_name="human",
     significant_ppi=False,
+    debug=False,
 ):
     data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), data_dir)
     abs_path = os.path.join(
@@ -46,7 +47,7 @@ def _generate_base_network(
     human_metab_pathway = {}
 
     if os.path.exists(os.path.join(abs_path, graph_name)) and predefined_network:
-        print("\tNetwork already exists...")
+        debug and print("\tNetwork already exists...")
         return
 
     ### Generate Protein-Gene mappings
@@ -90,7 +91,7 @@ def _generate_base_network(
 
     ### Generate pathway information file from .xml files downloaded from KEGG
     ### Contains Pathway name, Pathway ID, genes involved, compounds involved
-    print("\tRead and collate data from Human Pathway files...")
+    debug and print("\tRead and collate data from Human Pathway files...")
     pathway_info_dict = {}
 
     for file_i in os.listdir(os.path.join(data_path, "HumanPathways")):
@@ -140,7 +141,7 @@ def _generate_base_network(
     _save_file(os.path.join(abs_path, "human_metab_pathway_t.pkl"), human_metab_pathway)
 
     ### Convert the KEGG protein IDs and store
-    print("\tConverting KEGG IDs...")
+    debug and print("\tConverting KEGG IDs...")
     comb_genes = set()
     for i in pathway_info_dict.keys():
         comb_genes.update(pathway_info_dict[i]["gene"])
@@ -150,7 +151,7 @@ def _generate_base_network(
         step = 100
         store_resps = []
         for i in range(0, len(comb_genes), step):
-            print("\tProcessed - ", i, "/", len(comb_genes))
+            debug and print("\tProcessed - ", i, "/", len(comb_genes))
             req_api = "+".join(comb_genes[i : i + step])
             url = "https://rest.kegg.jp/list/" + req_api
             headers = {}
@@ -161,12 +162,12 @@ def _generate_base_network(
             kegg_gene_dict = {**kegg_gene_dict, **process_resp(i)}
         _save_file(os.path.join(data_path, "kegg_gene_dict.pkl"), kegg_gene_dict)
     else:
-        print("\tConversion file exists...")
+        debug and print("\tConversion file exists...")
         kegg_gene_dict = _read_file(os.path.join(data_path, "kegg_gene_dict.pkl"))
     ###
 
     ### Create the Protein-Metabolite edges by renaming the KEGG gene IDs
-    print("\tGenerate Protein-Metabolite edges...")
+    debug and print("\tGenerate Protein-Metabolite edges...")
     updated_edges = []
     for i in add_e:
         if i[0].startswith("hsa:"):
@@ -183,8 +184,8 @@ def _generate_base_network(
 
     ### Generate PPI edges if needed
     if use_ppi:
-        print("\tReading PPI files and adding edges...")
-        print("\tSignificant = ", significant_ppi)
+        debug and print("\tReading PPI files and adding edges...")
+        debug and print("\tSignificant = ", significant_ppi)
         ppi_arr = _get_ppi_edges(org_name=org_name, significant_ppi=significant_ppi)
         rna_l = set(rna_df.columns[1:])
         rr_edges = []
@@ -203,7 +204,7 @@ def _generate_base_network(
                         pp_edges.append((p1, p2))
     ###
     ### Save graph
-    print("\tSaving Graph...")
+    debug and print("\tSaving Graph...")
     g_base = nx.Graph()
     g_base.add_edges_from(updated_edges)
     g_base.add_edges_from(gene_prot_edges)

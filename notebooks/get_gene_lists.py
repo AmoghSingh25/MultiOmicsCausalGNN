@@ -34,9 +34,16 @@ def _(pl):
     return dfs, id_cols, start_ids
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Transcriptomics
+    """)
+    return
+
+
 @app.cell
 def _(dfs, id_cols, multipletests, np, start_ids, stats, tqdm):
-    ## Transcriptomics
     def return_filt(_i):
         pvals = []
         logfc = []

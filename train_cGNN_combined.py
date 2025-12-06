@@ -27,6 +27,24 @@ def drop_edges(inp_graph, p=0.5):
     return pyg
 
 
+class EarlyStop:
+    def __init__(self, patience, min_delta):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.min_score = torch.inf
+        self.ct = 0
+
+    def check(self, score):
+        if self.min_score - score > self.min_delta:
+            self.min_score = score
+            self.ct = 0
+        else:
+            self.ct += 1
+        if self.ct == self.patience:
+            return True
+        return False
+
+
 def normalize_output(input_graph):
     # input_graph['metabolite'] = torch.nn.functional.normalize(torch.FloatTensor(input_graph['metabolite']), dim=1)
     # input_graph['protein'] = torch.nn.functional.normalize(torch.FloatTensor(input_graph['protein']), dim=1)
@@ -35,7 +53,7 @@ def normalize_output(input_graph):
     return input_graph
 
 
-def _trainGNN(pyg, **kwargs):
+def _trainGNN(inp_pyg, **kwargs):
     """
     # Omic data containing the number of samples and the features of each sample
     # rna_data, prot_data, metab_data - (Number of samples, Number of features)
@@ -53,26 +71,35 @@ def _trainGNN(pyg, **kwargs):
     # Example, pm_edges - (Index of Protein feature, Index of Metabolite feature)
     """
 
-    device = torch.device("cpu")
+    device = torch.device(kwargs["config"]["model"]["device"])
     n_runs = kwargs["config"]["model"]["runs"]
     _timestamp = int(time.time())
     global_min_loss = sys.maxsize
     global_best_weight = None
 
     for i in range(n_runs):
-        print("\tRun No. = ", i + 1)
+        if type(inp_pyg) is list:
+            print("Multiple Graphs..")
+            pyg = inp_pyg[i]
+        else:
+            pyg = inp_pyg
+
+        kwargs["config"]["debug"] and print("\tRun No. = ", i + 1)
         seed_everything(kwargs["config"]["model"]["seed"][i])
         model = MultiLayerHuman(inp_dim=pyg["protein"].x.shape[1]).to(device)
-        optim = torch.optim.Adam(model.parameters(), lr=0.1)
+        optim = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+        early_stop = EarlyStop(patience=200, min_delta=1e-8)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optim, mode="min", factor=0.001, patience=10, min_lr=1e-10
+            optim, mode="min", factor=0.1, patience=20, min_lr=1e-10
         )
         loss_fn = torch.nn.MSELoss()
 
         pyg = pyg.to(device)
         model = model.to(device)
 
-        print("\tModel validation result = ", pyg.validate())
+        kwargs["config"]["debug"] and print(
+            "\tModel validation result = ", pyg.validate()
+        )
 
         best_model_weight = None
         model.train()
@@ -90,20 +117,12 @@ def _trainGNN(pyg, **kwargs):
         for epoch in prog_bar:
             model.train()
 
-            # Re-create noise of intermediate nodes
-            # pyg["protein"].x = torch.randn(
-            #     pyg["protein"].x.shape[0], pyg["protein"].x.shape[1]
-            # )
-            # pyg["metabolite"].x = torch.randn(
-            #     pyg["metabolite"].x.shape[0], pyg["metabolite"].x.shape[1]
-            # )
-
             if kwargs["config"]["model"]["drop_edges"] > 0:
                 pyg_train = drop_edges(pyg, p=kwargs["config"]["model"]["drop_edges"])
 
             optim.zero_grad()
             out = model(pyg_train.x_dict, pyg_train.edge_index_dict)
-            out = normalize_output(out)
+            # out = normalize_output(out)
 
             loss1 = loss_fn(
                 out["metabolite"][:, pyg["metabolite"].train_mask],
@@ -124,7 +143,7 @@ def _trainGNN(pyg, **kwargs):
             model.eval()
             with torch.no_grad():
                 out_val = model(pyg.x_dict, pyg.edge_index_dict)
-                out_val = normalize_output(out_val)
+                # out_val = normalize_output(out_val)
 
                 loss1_val = loss_fn(
                     out_val["metabolite"][:, pyg["metabolite"].test_mask],
@@ -140,8 +159,9 @@ def _trainGNN(pyg, **kwargs):
                     + kwargs["config"]["model"]["prot_loss"] * loss2_val
                 )
             scheduler.step(loss_comb_val)
-            # if epoch % 100 == 0:
-            #     prog_bar.set_description(f"Loss:{loss_comb}, Val Loss:{loss_comb_val}")
+            prog_bar.set_description(
+                f"Global best Loss:{global_min_loss}, Run best Loss:{min_val_loss}"
+            )
 
             if loss_comb_val < min_val_loss:
                 best_model_weight = model.state_dict()
@@ -160,6 +180,9 @@ def _trainGNN(pyg, **kwargs):
             losses_val.append(loss_comb_val.item())
 
             lrs.append(scheduler.get_last_lr()[0])
+            if early_stop.check(loss_comb_val):
+                kwargs["config"]["debug"] and print("\t Stopping due to Early Stopping")
+                break
 
         parent_dir = os.path.dirname(os.path.realpath(__file__))
         abs_path = os.path.join(
@@ -194,9 +217,11 @@ def _trainGNN(pyg, **kwargs):
         with open(log_path, "w") as f:
             json.dump(log_, f)
 
-        print(f"\tTraining Completed. Saved logs at {log_path}")
+        kwargs["config"]["debug"] and print(
+            f"\tTraining Completed. Saved logs at {log_path}"
+        )
     abs_path = os.path.join(
         parent_dir, kwargs["save_dir"], "weights", kwargs["weight_path"]
     )
-    print("Saving global weight at ", abs_path)
+    kwargs["config"]["debug"] and print("Saving global weight at ", abs_path)
     torch.save(global_best_weight, abs_path)
