@@ -44,6 +44,9 @@ uv run main.py -cn custom_config # Specify a custom config
 
 `causal_disc.py` must be run before running `main.py` if causal links need to be computed and added to the network. The corresponding changes must also be made in the config file (Enabling causal edges, specifying causal discovery parameters).
 
+## [Configuration description](docs/config_desc.md)
+[Config description](docs/config_desc.md)
+
 ## Working
 - Gene expression and proteomics filtered using https://www.gsea-msigdb.org/gsea/msigdb/human/collections.jsp
 - Wikipages taken from wikimedia export, split into docs using WikiExtractor and loaded into RAG.
