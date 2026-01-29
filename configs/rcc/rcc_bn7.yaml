@@ -20,4 +20,3 @@ intervention:
   sample: 1
   mult: 1.2
   pathway: Central carbon metabolism in cancer
-perform_intervention: false

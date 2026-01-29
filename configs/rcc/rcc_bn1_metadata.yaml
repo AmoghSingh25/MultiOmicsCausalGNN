@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - ./rcc@_global_
+  - _self_
+name: rcc_bn1_metadata
+description: PPI network with metadata
+model:
+  use_metadata: true
+  train_single_sample: true
+data:
+  predefined_network: false
+  use_causal_edges: false
+  significant_ppi: false
+  use_ppi_network: true
+  metadata_file: Data/input_data/KidneyTumorData/frmt_metadata.pkl
+pathway_analysis:
+  enabled: false
+intervention:
+  enabled: false
+debug: true

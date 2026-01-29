@@ -17,4 +17,3 @@ causal:
     model_id: meta-llama-3.1-8b-instruct
     temperature: 0.7
     rag: true
-perform_intervention: false

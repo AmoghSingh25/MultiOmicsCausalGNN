@@ -1,9 +1,9 @@
-from torch_geometric.nn import HeteroConv, HeteroDictLinear, SAGEConv
+from torch_geometric.nn import HeteroConv, HeteroDictLinear, SAGEConv, Linear
 import torch
 
 
 class MultiLayerHuman(torch.nn.Module):
-    def __init__(self, inp_dim):
+    def __init__(self, inp_dim, use_metadata=False):
         super().__init__()
         self.lin1 = HeteroDictLinear(
             in_channels=inp_dim, out_channels=64, types=["rna", "protein", "metabolite"]
@@ -17,6 +17,13 @@ class MultiLayerHuman(torch.nn.Module):
             out_channels=inp_dim,
             types=["rna", "protein", "metabolite"],
         )
+
+        self.use_metadata = use_metadata
+        if self.use_metadata:
+            self.metadata_lin = Linear(
+                in_channels=inp_dim,
+                out_channels=128,
+            )
 
         self.norm1 = torch.nn.LayerNorm(64)
 
@@ -69,7 +76,7 @@ class MultiLayerHuman(torch.nn.Module):
         # )
         # self.norm5 = torch.nn.LayerNorm(128)
 
-    def forward(self, data, edge_dict):
+    def forward(self, data, edge_dict, metadata=None):
         x_dict = self.lin1(data)
         x_dict = {k: self.drop1(self.norm1(v.relu())) for k, v in x_dict.items()}
 
@@ -87,8 +94,14 @@ class MultiLayerHuman(torch.nn.Module):
         # x_dict = {k: v + res2[k] for k, v in x_dict.items()}
 
         # x_dict = {k: self.norm4(v).relu() for k, v in x_dict.items()}
-
-        x_dict = {k: v + res1[k] for k, v in x_dict.items()}
+        print("DEBUG ", res1['rna'].shape)
+        print("DEBUG ", data['metadata'].shape)
+        return
+        if self.use_metadata:
+            x_dict = {k: v + res1[k] + self.metadata_lin(metadata) for k, v in x_dict.items()}
+        else:
+            x_dict = {k: v + res1[k] for k, v in x_dict.items()}
+        
         x_dict = {k: self.drop3(v) for k, v in x_dict.items()}
         x_dict = self.lin3(x_dict)
         # x_dict = {k: F.softplus(v) for k, v in x_dict.items()}

@@ -7,8 +7,8 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import polars as pl
-
-    return (pl,)
+    import pickle
+    return pickle, pl
 
 
 @app.cell
@@ -69,13 +69,28 @@ def _(pl):
 
 
 @app.cell
-def _(common_ids, pl):
-    _t = pl.read_excel(
-        "/Users/amogh/Downloads/mmc2.xlsx", sheet_name="clinical_characteristics"
-    )
-    _t = _t.select(["caseID", "tumorClass"])
-    _t = _t.filter(pl.col("caseID").is_in(common_ids))
-    _t
+def _(pickle):
+    with open("Data/input_data/KidneyTumorData/encoded_metadata.pkl", "rb") as file:
+        metadata = pickle.load(file)
+    return (metadata,)
+
+
+@app.cell
+def _(common_ids, metadata):
+    filt_metadata = []
+    for i in common_ids:
+        _id = i[: i.index("-", 4)]
+        if _id in metadata:
+            filt_metadata.append(metadata[_id])
+        else:
+            filt_metadata.append([0] * 1526)
+    return (filt_metadata,)
+
+
+@app.cell
+def _(filt_metadata, pickle):
+    with open("Data/input_data/KidneyTumorData/frmt_metadata.pkl", "wb") as _file:
+        pickle.dump(file=_file, obj=filt_metadata)
     return
 
 

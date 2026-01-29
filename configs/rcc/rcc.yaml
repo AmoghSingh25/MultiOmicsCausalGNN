@@ -45,4 +45,3 @@ causal:
     temperature: 0.7
     rag: true
     context: 100000
-perform_intervention: false

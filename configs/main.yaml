@@ -13,6 +13,7 @@ model:
   prot_loss: 0
   metab_loss : 1
   drop_edges: 0.5
+  use_metadata: false
 data:
   dir: Data/
   org_name: human
@@ -49,3 +50,5 @@ intervention:
   pathway: Central carbon metabolism in cancer
 output:
   save_dir: output/
+pathway_analysis:
+  enabled: true

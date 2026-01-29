@@ -12,4 +12,3 @@ data:
   random_edges: true
   n_random_edges_rna: 162
   n_random_edges_prot: 231
-perform_intervention: false

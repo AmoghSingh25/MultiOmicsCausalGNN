@@ -17,6 +17,7 @@ from generate_pathways import _generate_base_network
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from eval_models import get_weight_scores
+from utils import _read_file
 
 
 def _create_dirs(cfg):
@@ -54,6 +55,12 @@ def main(cfg: DictConfig):
         os.path.join(os.path.dirname(os.path.realpath(__file__)), cfg.data.prot_data),
         null_values=["NA"],
     )
+    metadata = None
+    if cfg.model.get("use_metadata", False):
+        if not os.path.exists(cfg.data.get("metadata_file", "frmt_metadata.pkl")):
+            raise FileNotFoundError("Metadata file not found")
+        metadata = _read_file(cfg.data['metadata_file'])
+    
     _generate_base_network(
         rna_df,
         predefined_network=cfg.data.predefined_network,
@@ -63,6 +70,7 @@ def main(cfg: DictConfig):
         use_ppi=cfg.data.use_ppi_network,
         org_name=cfg.data.org_name,
         significant_ppi=cfg.data.significant_ppi,
+        debug=cfg.get("debug", False)
     )
 
     cfg.debug and print("\tCreating graph...")
@@ -116,6 +124,7 @@ def main(cfg: DictConfig):
                 weight_path=cfg.model.save_file,
                 save_dir=output_dir,
                 config=OmegaConf.to_container(cfg=cfg, resolve=True),
+                metadata=metadata
             )
         else:
             cfg.debug and print("Starting GNN training on combined samples...")
@@ -125,6 +134,7 @@ def main(cfg: DictConfig):
                 weight_path=cfg.model.save_file,
                 save_dir=output_dir,
                 config=OmegaConf.to_container(cfg=cfg, resolve=True),
+                metadata=metadata
             )
 
     metabs = list(metab_df.columns)[1:]
@@ -144,7 +154,8 @@ def main(cfg: DictConfig):
         )
         return
 
-    _pathway_analysis(
+    if cfg.pathway_analysis.get("enabled", True):
+        _pathway_analysis(
         pyg_copy,
         weight_path=weight_path,
         metabs=metabs,

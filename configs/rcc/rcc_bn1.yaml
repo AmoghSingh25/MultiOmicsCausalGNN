@@ -9,4 +9,4 @@ data:
   use_causal_edges: false
   significant_ppi: false
   use_ppi_network: true
-perform_intervention: false
+debug: true

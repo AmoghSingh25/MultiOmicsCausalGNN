@@ -8,3 +8,5 @@ __pycache__/
 output/
 orig_data/
 multirun/
+Data/input_data
+Data/

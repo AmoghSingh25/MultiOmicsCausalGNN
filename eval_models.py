@@ -59,7 +59,6 @@ def save_stats(network_name, pyg, path, weight_path, seed, device):
     metric[network_name]["target_metab"] = torch.std(norm_metab_target, dim=1)
     return metric
 
-
 def get_weight_scores(pyg, output_path, metab_ratio, prot_ratio, seeds, device):
     device = torch.device(device)
     weight_dir = os.path.join(output_path, "weights")
@@ -84,12 +83,9 @@ def get_weight_scores(pyg, output_path, metab_ratio, prot_ratio, seeds, device):
         losses.append(
             (prot_loss, metab_loss, metab_loss * metab_ratio + prot_loss * prot_ratio)
         )
-        # print(weight_dir_i, " - Protein - ", prot_loss.item(), " Metab - ", metab_loss.item(), " Combined - ", (metab_loss * metab_ratio + prot_loss * prot_ratio).item())
 
     losses = np.array(losses)
 
-    # new_metric = save_stats(os.path.split(output_path)[-1], pyg, output_dir, os.path.join(weight_dir, weight_files[min_loss_idx]), seeds[min_loss_idx])
-    # _save_file(output_dir, new_metric)
 
     print(output_path)
     print("Min - ", np.min(losses, axis=0))
