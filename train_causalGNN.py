@@ -29,7 +29,7 @@ def _trainGNN(pyg, **kwargs):
     """
     metadata = kwargs['metadata']
     cfg_device = kwargs["config"]["model"]["device"]
-    device = torch.device(cfg_device)
+    device = kwargs['device']
     n_runs = kwargs["config"]["model"]["runs"]
     _timestamp = int(time.time())
     global_min_loss = sys.maxsize

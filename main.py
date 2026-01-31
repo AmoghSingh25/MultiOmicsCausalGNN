@@ -132,7 +132,8 @@ def main(cfg: DictConfig):
                 weight_path=cfg.model.save_file,
                 save_dir=output_dir,
                 config=OmegaConf.to_container(cfg=cfg, resolve=True),
-                metadata=metadata
+                metadata=metadata,
+                device=torch_device
             )
         else:
             cfg.debug and print("Starting GNN training on combined samples...")
@@ -142,7 +143,8 @@ def main(cfg: DictConfig):
                 weight_path=cfg.model.save_file,
                 save_dir=output_dir,
                 config=OmegaConf.to_container(cfg=cfg, resolve=True),
-                metadata=metadata
+                metadata=metadata,
+                device=torch_device
             )
 
     metabs = list(metab_df.columns)[1:]

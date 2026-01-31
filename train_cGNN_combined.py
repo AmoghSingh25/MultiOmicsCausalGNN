@@ -71,7 +71,8 @@ def _trainGNN(inp_pyg, **kwargs):
     # Example, pm_edges - (Index of Protein feature, Index of Metabolite feature)
     """
     metadata=kwargs['metadata']
-    device = torch.device(kwargs["config"]["model"]["device"])
+    # device = torch.device(kwargs["config"]["model"]["device"])
+    device = kwargs['device']
     n_runs = kwargs["config"]["model"]["runs"]
     _timestamp = int(time.time())
     global_min_loss = sys.maxsize
