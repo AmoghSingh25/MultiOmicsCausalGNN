@@ -5,7 +5,7 @@ defaults:
 name: rcc_bn1
 description: PPI network only
 model:
-  use_metadata: true
+  use_metadata: false
   train_single_sample: true
 data:
   predefined_network: false
