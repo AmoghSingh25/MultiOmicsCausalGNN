@@ -1,3 +1,4 @@
+import copy
 import torch
 from torch_geometric.data import Dataset, HeteroData
 from torch_geometric.utils import dropout_edge
@@ -32,7 +33,7 @@ class OmicGraphDataset(Dataset):
         self.rna_x = input_graph["rna"].x[:, self.mask]
         self.protein_x = input_graph["protein"].x[:, self.mask]
         self.metab_x = input_graph["metabolite"].x[:, self.mask]
-        self.metadata = input_graph['metadata'][:, self.mask]
+        self.metadata = input_graph['rna'].metadata[:, self.mask]
 
         self.rna_x.to(self.device)
         self.protein_x.to(self.device)
@@ -40,14 +41,10 @@ class OmicGraphDataset(Dataset):
         self.base_graph = input_graph
         self.p = p
         self.drop_edges = drop_edges
-        self.graphs = []
-        for i in range(self.len()):
-            graph_i = self.gen_graph(i)
-            graph_i.to(self.device)
-            self.graphs.append(graph_i)
 
     def drop_edges_func(self, inp_graph):
         pyg_train = inp_graph.clone()
+
         pyg_train["rna", "links", "rna"].edge_index = dropout_edge(
             inp_graph["rna", "links", "rna"].edge_index, p=self.p
         )[0]
@@ -71,12 +68,12 @@ class OmicGraphDataset(Dataset):
 
     def gen_graph(self, idx):
         pyg = HeteroData()
-        # pyg = self.base_graph.clone()
+
         pyg["rna"].x = self.rna_x[:, idx].reshape(-1, 1)
         pyg["protein"].x = torch.randn(self.protein_x.shape[0], 1)
         pyg["metabolite"].x = torch.randn(self.metab_x.shape[0], 1)
 
-        pyg["metadata"] = self.metadata[:, idx].reshape(-1, 1)
+        pyg['rna'].metadata = self.metadata[:, idx]
 
         pyg["rna"].y = self.rna_x[:, idx].reshape(-1, 1)
         pyg["protein"].y = torch.nn.functional.normalize(
@@ -112,3 +109,7 @@ class OmicGraphDataset(Dataset):
         if self.drop_edges:
             pyg = self.drop_edges_func(pyg)
         return pyg
+    
+    def get(self, idx):
+        with torch.no_grad():
+            return self.gen_graph(idx)

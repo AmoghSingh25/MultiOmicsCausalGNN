@@ -12,7 +12,7 @@ model:
   runs: 5
   prot_loss: 0.6
   metab_loss : 0.4
-  device: mps
+  device: cuda
   drop_edges: 0.6
   seed:
     - 2729424255

@@ -221,7 +221,6 @@ def _intervention_analysis(
                 rna_indices.add(rna_s[e[1]])
     del rna_s
 
-    device = torch.device(device)
     if single_sample_model:
         prot_init, metab_init, protein_new, metab_new = _single_sample_inference(
             pyg,

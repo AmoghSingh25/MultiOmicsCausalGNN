@@ -241,7 +241,6 @@ def _generate_pyg(
     if type(seed) is list:
         seed = seed[0]
 
-    device = torch.device(device)
     np.random.seed(seed)
 
     rr_edges, rp_edges, pp_edges, pm_edges = _generate_graph(
@@ -366,7 +365,7 @@ def _generate_multiple_graphs(
     rna_causal_method="ges",
     prot_causal_method="fci",
     seed=None,
-    device="cpu",
+    device=torch.device("cpu"),
     debug=False,
 ):
     pyg_graphs = []
@@ -378,7 +377,6 @@ def _generate_multiple_graphs(
         assert train_test_ratio > 0 and train_test_ratio <= 1, (
             "Train-test ratio out of bounds (0<r<=1)"
         )
-        device = torch.device(device)
         np.random.seed(i)
 
         rr_edges, rp_edges, pp_edges, pm_edges = _generate_graph(

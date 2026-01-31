@@ -10,6 +10,7 @@ from train_causalGNN import _trainGNN
 from train_cGNN_combined import _trainGNN as _trainGNN_combined
 from generate_graph import _generate_pyg, _generate_multiple_graphs
 import polars as pl
+import torch
 from analysis import _pathway_analysis, _intervention_analysis
 import os
 import copy
@@ -74,6 +75,13 @@ def main(cfg: DictConfig):
     )
 
     cfg.debug and print("\tCreating graph...")
+    if torch.cuda.is_available():
+        torch_device = torch.device("cuda")
+    elif torch.mps.is_available():
+        torch_device = torch.device("mps")
+    else:
+        torch_device = torch.device("cpu")
+
     if cfg.data.random_edges:
         print("Generating multiple graphs..")
         pyg = _generate_multiple_graphs(
@@ -91,7 +99,7 @@ def main(cfg: DictConfig):
             rna_causal_method=cfg.causal.rna_method,
             prot_causal_method=cfg.causal.prot_method,
             seed=list(cfg["model"]["seed"]),
-            device=cfg.model.get("device", "cpu"),
+            device=torch_device,
             debug=cfg.debug,
         )
     else:
@@ -110,7 +118,7 @@ def main(cfg: DictConfig):
             rna_causal_method=cfg.causal.rna_method,
             prot_causal_method=cfg.causal.prot_method,
             seed=list(cfg["model"]["seed"]),
-            device=cfg.model.get("device", "cpu"),
+            device=torch_device,
             debug=cfg.debug,
         )
 
@@ -150,7 +158,7 @@ def main(cfg: DictConfig):
             metab_ratio=cfg.model.metab_loss,
             prot_ratio=cfg.model.prot_loss,
             seeds=list(cfg.model.test_seed),
-            device=cfg.model.get("device", "cpu"),
+            device=torch_device,
         )
         return
 
@@ -161,7 +169,7 @@ def main(cfg: DictConfig):
         metabs=metabs,
         sample_id=cfg.intervention.sample,
         output_dir=output_dir,
-        device=cfg.model.get("device", "cpu"),
+        device=torch_device,
     )
 
     if cfg.intervention.enabled:
@@ -176,7 +184,7 @@ def main(cfg: DictConfig):
             weight_path=weight_path,
             output_dir=output_dir,
             debug=cfg.debug,
-            device=cfg.model.get("device", "cpu"),
+            device=torch_device,
         )
 
 

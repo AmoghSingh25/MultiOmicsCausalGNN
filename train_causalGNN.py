@@ -39,7 +39,7 @@ def _trainGNN(pyg, **kwargs):
         metadata = torch.FloatTensor(metadata)
         metadata = torch.swapaxes(metadata, 0,1)
         metadata = metadata.to(device)
-        pyg['metadata'] = metadata
+        pyg['rna'].metadata = metadata
 
     for i in range(n_runs):
         kwargs["config"]["debug"] and print("\tRun No. = ", i + 1)
@@ -48,10 +48,10 @@ def _trainGNN(pyg, **kwargs):
         train_dataset = OmicGraphDataset(pyg, device=cfg_device)
         test_dataset = OmicGraphDataset(pyg, training=False, device=cfg_device)
 
-        train_loader = DataLoader(train_dataset, shuffle=True, batch_size=8)
-        test_loader = DataLoader(test_dataset, batch_size=8)
+        train_loader = DataLoader(train_dataset, shuffle=True, batch_size=1)
+        test_loader = DataLoader(test_dataset, batch_size=1)
 
-        model = MultiLayerHuman(inp_dim=1, use_metadata=kwargs['config']['model']['use_metadata']).to(device)
+        model = MultiLayerHuman(inp_dim=1, use_metadata=kwargs['config']['model']['use_metadata'], n_metadata=metadata.shape[0]).to(device)
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optim, mode="min", factor=0.01, patience=5, min_lr=1e-12
@@ -79,13 +79,16 @@ def _trainGNN(pyg, **kwargs):
         for _ in tqdm(range(kwargs["epochs"])):
             loss_p, loss_m, loss_p_test, loss_m_test = 0, 0, 0, 0
             loss_comb_train, loss_comb_test = 0, 0
+            if device.type == "mps":
+                torch.mps.empty_cache()
 
             # Loop over train samples
             for sample_x in train_loader:
+                sample_x = sample_x.to(device)
                 optim.zero_grad()
-                print("DEBUG Sample - ", sample_x)
-                out = model(sample_x.x_dict, sample_x.edge_index_dict, metadata)
 
+                out = model(sample_x.x_dict, sample_x.edge_index_dict, sample_x['rna'].metadata)
+            
                 loss1 = loss_fn(
                     out["metabolite"],
                     sample_x["metabolite"].y,
@@ -100,18 +103,20 @@ def _trainGNN(pyg, **kwargs):
                     + kwargs["config"]["model"]["prot_loss"] * loss2
                 )
 
-                loss_m = loss_m + loss1
-                loss_p = loss_p + loss2
+                loss_m += loss1.item()
+                loss_p += loss2.item()
                 loss_comb_train = loss_comb_train + loss_comb
 
                 loss_comb.backward()
                 optim.step()
+
             scheduler.step(loss_comb)
 
             # Loop over test samples
             with torch.no_grad():
                 for sample_x in test_loader:
-                    out = model(sample_x.x_dict, sample_x.edge_index_dict)
+                    sample_x = sample_x.to(device)
+                    out = model(sample_x.x_dict, sample_x.edge_index_dict, sample_x['rna'].metadata)
 
                     loss1_test = loss_fn(
                         out["metabolite"],
@@ -146,8 +151,8 @@ def _trainGNN(pyg, **kwargs):
                 global_best_weight = model.state_dict()
                 global_min_loss = loss_comb_test.item()
 
-            losses_metab.append(loss_m.item())
-            losses_prot.append(loss_p.item())
+            losses_metab.append(loss_m)
+            losses_prot.append(loss_p)
             losses.append(loss_comb_train.item())
 
             losses_val_metab.append(loss_m_test.item())

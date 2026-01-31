@@ -60,7 +60,6 @@ def save_stats(network_name, pyg, path, weight_path, seed, device):
     return metric
 
 def get_weight_scores(pyg, output_path, metab_ratio, prot_ratio, seeds, device):
-    device = torch.device(device)
     weight_dir = os.path.join(output_path, "weights")
     weight_files = os.listdir(weight_dir)
     weight_files.sort()
