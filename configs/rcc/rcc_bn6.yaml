@@ -4,6 +4,10 @@ defaults:
   - _self_
 name: rcc_bn6
 description: Causal Links with PPI links
+model:
+  use_metadata: false
+  train_single_sample: true
+  batch_size: 8
 data:
   predefined_network: false
   use_causal_edges: true
@@ -15,3 +19,8 @@ causal:
     model_id: meta-llama-3.1-8b-instruct
     temperature: 0.7
     rag: true
+pathway_analysis:
+  enabled: false
+intervention:
+  enabled: false
+debug: true

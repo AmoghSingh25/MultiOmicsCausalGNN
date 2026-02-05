@@ -4,8 +4,17 @@ defaults:
   - _self_
 name: rcc_bn2
 description: Significant PPI
+model:
+  use_metadata: false
+  train_single_sample: true
+  batch_size: 8
 data:
   predefined_network: false
   use_causal_edges: false
   significant_ppi: true
   use_ppi_network: true
+pathway_analysis:
+  enabled: false
+intervention:
+  enabled: false
+debug: true

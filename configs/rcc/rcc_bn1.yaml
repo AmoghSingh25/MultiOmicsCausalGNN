@@ -7,7 +7,7 @@ description: PPI network only
 model:
   use_metadata: false
   train_single_sample: true
-  batch_size: 1
+  batch_size: 8
 data:
   predefined_network: false
   use_causal_edges: false

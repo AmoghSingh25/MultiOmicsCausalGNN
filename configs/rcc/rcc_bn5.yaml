@@ -4,6 +4,10 @@ defaults:
   - _self_
 name: rcc_bn5
 description: Random links
+model:
+  use_metadata: false
+  train_single_sample: true
+  batch_size: 8
 data:
   predefined_network: false
   use_causal_edges: false
@@ -12,3 +16,8 @@ data:
   random_edges: true
   n_random_edges_rna: 162
   n_random_edges_prot: 231
+pathway_analysis:
+  enabled: false
+intervention:
+  enabled: false
+debug: true
