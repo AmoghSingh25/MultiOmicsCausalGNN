@@ -31,8 +31,8 @@ data:
   base_network_file: human_base_network.graphml
 causal:
   alpha: 0.05
-  rna_method: ges
-  prot_method: ges
+  rna_method: fci
+  prot_method: fci
   rna_indep_test: mv_fisherz
   prot_indep_test: mv_fisherz
   replaceNanRNA: false

@@ -129,6 +129,9 @@ def _generate_graph(
                 os.path.join(abs_path, prot_causal_method + "_pp_causal_edges.pkl")
             )
             causal_pp_edges = [(x[1], x[0]) for x in causal_pp_edges]
+        else:
+            print("Causal edges files not found... Continuing with base network")
+        
         if os.path.exists(
             os.path.join(abs_path, rna_causal_method + "_rr_causal_edges.pkl")
         ):

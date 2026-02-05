@@ -10,7 +10,7 @@ model:
   batch_size: 8
 data:
   predefined_network: true
-  use_causal_edges: true
+  use_causal_edges: false
   significant_ppi: false
   use_ppi_network: false
 causal:
