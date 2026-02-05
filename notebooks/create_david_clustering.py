@@ -8,6 +8,7 @@ app = marimo.App(width="medium")
 def _():
     import numpy as np
     import polars as pl
+
     return np, pl
 
 
@@ -96,6 +97,7 @@ def _(gene_edges, np, rna_cols):
 @app.cell
 def _(gene_edges_idx):
     from utils import _save_file
+
     _save_file("output/rcc_bn3/network/rr_edges.pkl", gene_edges_idx)
     return
 
@@ -155,6 +157,7 @@ def _(prot_edges_index):
 @app.cell
 def _(prot_edges_index):
     from utils import _save_file
+
     _save_file("output/rcc_bn3/network/pp_edges.pkl", prot_edges_index)
     return
 

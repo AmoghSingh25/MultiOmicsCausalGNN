@@ -12,6 +12,7 @@ def _():
 @app.cell
 def _():
     from utils import _read_file
+
     metric = _read_file("output/comp_metrics.pkl")
     return (metric,)
 

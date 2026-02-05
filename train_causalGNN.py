@@ -27,33 +27,50 @@ def _trainGNN(pyg, **kwargs):
     # Each pair contains the index of the feature from the first and second omic data respectively
     # Example, pm_edges - (Index of Protein feature, Index of Metabolite feature)
     """
-    metadata = kwargs['metadata']
-    device = kwargs['device']
+    metadata = kwargs["metadata"]
+    device = kwargs["device"]
     n_runs = kwargs["config"]["model"]["runs"]
     _timestamp = int(time.time())
     global_min_loss = sys.maxsize
     global_best_weight = None
 
-    if kwargs['config']['model']['use_metadata']:
+    if kwargs["config"]["model"]["use_metadata"]:
         metadata = torch.FloatTensor(metadata)
-        metadata = torch.swapaxes(metadata, 0,1)
+        metadata = torch.swapaxes(metadata, 0, 1)
         metadata = metadata.to(device)
     else:
-        metadata = torch.zeros_like(pyg['rna'].x)
+        metadata = torch.zeros_like(pyg["rna"].x)
 
-    pyg['rna'].metadata = metadata
+    pyg["rna"].metadata = metadata
 
     for i in range(n_runs):
         kwargs["config"]["debug"] and print("\tRun No. = ", i + 1)
 
         seed_everything(kwargs["config"]["model"]["seed"][i])
-        train_dataset = OmicGraphDataset(pyg, device=device, use_metadata=kwargs['config']['model']['use_metadata'])
-        test_dataset = OmicGraphDataset(pyg, training=False, device=device, use_metadata=kwargs['config']['model']['use_metadata'])
+        train_dataset = OmicGraphDataset(
+            pyg, device=device, use_metadata=kwargs["config"]["model"]["use_metadata"]
+        )
+        test_dataset = OmicGraphDataset(
+            pyg,
+            training=False,
+            device=device,
+            use_metadata=kwargs["config"]["model"]["use_metadata"],
+        )
 
-        train_loader = DataLoader(train_dataset, shuffle=True, batch_size=kwargs['config']['model']['batch_size'])
-        test_loader = DataLoader(test_dataset, batch_size=kwargs['config']['model']['batch_size'])
+        train_loader = DataLoader(
+            train_dataset,
+            shuffle=True,
+            batch_size=kwargs["config"]["model"]["batch_size"],
+        )
+        test_loader = DataLoader(
+            test_dataset, batch_size=kwargs["config"]["model"]["batch_size"]
+        )
 
-        model = MultiLayerHuman(inp_dim=1, use_metadata=kwargs['config']['model']['use_metadata'], n_metadata=metadata.shape[0]).to(device)
+        model = MultiLayerHuman(
+            inp_dim=1,
+            use_metadata=kwargs["config"]["model"]["use_metadata"],
+            n_metadata=metadata.shape[0],
+        ).to(device)
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optim, mode="min", factor=0.01, patience=5, min_lr=1e-12
@@ -89,8 +106,10 @@ def _trainGNN(pyg, **kwargs):
                 sample_x = sample_x.to(device)
                 optim.zero_grad()
 
-                out = model(sample_x.x_dict, sample_x.edge_index_dict, sample_x['rna'].metadata)
-            
+                out = model(
+                    sample_x.x_dict, sample_x.edge_index_dict, sample_x["rna"].metadata
+                )
+
                 loss1 = loss_fn(
                     out["metabolite"],
                     sample_x["metabolite"].y,
@@ -118,7 +137,11 @@ def _trainGNN(pyg, **kwargs):
             with torch.no_grad():
                 for sample_x in test_loader:
                     sample_x = sample_x.to(device)
-                    out = model(sample_x.x_dict, sample_x.edge_index_dict, sample_x['rna'].metadata)
+                    out = model(
+                        sample_x.x_dict,
+                        sample_x.edge_index_dict,
+                        sample_x["rna"].metadata,
+                    )
 
                     loss1_test = loss_fn(
                         out["metabolite"],

@@ -94,12 +94,15 @@ class MultiLayerHuman(torch.nn.Module):
         # x_dict = {k: v + res2[k] for k, v in x_dict.items()}
 
         # x_dict = {k: self.norm4(v).relu() for k, v in x_dict.items()}
-        
+
         if self.use_metadata:
-            x_dict = {k: v + res1[k] + self.metadata_lin(metadata.reshape(1, -1)) for k, v in x_dict.items()}
+            x_dict = {
+                k: v + res1[k] + self.metadata_lin(metadata.reshape(1, -1))
+                for k, v in x_dict.items()
+            }
         else:
             x_dict = {k: v + res1[k] for k, v in x_dict.items()}
-        
+
         x_dict = {k: self.drop3(v) for k, v in x_dict.items()}
         x_dict = self.lin3(x_dict)
         # x_dict = {k: F.softplus(v) for k, v in x_dict.items()}

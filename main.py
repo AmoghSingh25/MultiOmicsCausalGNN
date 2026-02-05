@@ -60,8 +60,8 @@ def main(cfg: DictConfig):
     if cfg.model.get("use_metadata", False):
         if not os.path.exists(cfg.data.get("metadata_file", "frmt_metadata.pkl")):
             raise FileNotFoundError("Metadata file not found")
-        metadata = _read_file(cfg.data['metadata_file'])
-    
+        metadata = _read_file(cfg.data["metadata_file"])
+
     _generate_base_network(
         rna_df,
         predefined_network=cfg.data.predefined_network,
@@ -71,7 +71,7 @@ def main(cfg: DictConfig):
         use_ppi=cfg.data.use_ppi_network,
         org_name=cfg.data.org_name,
         significant_ppi=cfg.data.significant_ppi,
-        debug=cfg.get("debug", False)
+        debug=cfg.get("debug", False),
     )
 
     cfg.debug and print("\tCreating graph...")
@@ -133,7 +133,7 @@ def main(cfg: DictConfig):
                 save_dir=output_dir,
                 config=OmegaConf.to_container(cfg=cfg, resolve=True),
                 metadata=metadata,
-                device=torch_device
+                device=torch_device,
             )
         else:
             cfg.debug and print("Starting GNN training on combined samples...")
@@ -144,7 +144,7 @@ def main(cfg: DictConfig):
                 save_dir=output_dir,
                 config=OmegaConf.to_container(cfg=cfg, resolve=True),
                 metadata=metadata,
-                device=torch_device
+                device=torch_device,
             )
 
     metabs = list(metab_df.columns)[1:]
@@ -166,13 +166,13 @@ def main(cfg: DictConfig):
 
     if cfg.pathway_analysis.get("enabled", True):
         _pathway_analysis(
-        pyg_copy,
-        weight_path=weight_path,
-        metabs=metabs,
-        sample_id=cfg.intervention.sample,
-        output_dir=output_dir,
-        device=torch_device,
-    )
+            pyg_copy,
+            weight_path=weight_path,
+            metabs=metabs,
+            sample_id=cfg.intervention.sample,
+            output_dir=output_dir,
+            device=torch_device,
+        )
 
     if cfg.intervention.enabled:
         _intervention_analysis(

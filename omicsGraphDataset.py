@@ -16,7 +16,7 @@ class OmicGraphDataset(Dataset):
         drop_edges=True,
         p=0.5,
         device="mps",
-        use_metadata=False
+        use_metadata=False,
     ):
         super().__init__(root, transform, pre_transform, None)
         ## Data shape - (No. samples, No. features)
@@ -35,7 +35,7 @@ class OmicGraphDataset(Dataset):
         self.rna_x = input_graph["rna"].x[:, self.mask]
         self.protein_x = input_graph["protein"].x[:, self.mask]
         self.metab_x = input_graph["metabolite"].x[:, self.mask]
-        self.metadata = input_graph['rna'].metadata[:, self.mask]
+        self.metadata = input_graph["rna"].metadata[:, self.mask]
 
         self.rna_x.to(self.device)
         self.protein_x.to(self.device)
@@ -74,7 +74,7 @@ class OmicGraphDataset(Dataset):
         pyg["rna"].x = self.rna_x[:, idx].reshape(-1, 1)
         pyg["protein"].x = torch.randn(self.protein_x.shape[0], 1)
         pyg["metabolite"].x = torch.randn(self.metab_x.shape[0], 1)
-        pyg['rna'].metadata = self.metadata[:, idx]
+        pyg["rna"].metadata = self.metadata[:, idx]
 
         pyg["rna"].y = self.rna_x[:, idx].reshape(-1, 1)
         pyg["protein"].y = torch.nn.functional.normalize(
@@ -110,7 +110,7 @@ class OmicGraphDataset(Dataset):
         if self.drop_edges:
             pyg = self.drop_edges_func(pyg)
         return pyg
-    
+
     def get(self, idx):
         with torch.no_grad():
             return self.gen_graph(idx)
