@@ -5,7 +5,7 @@ eval: false
 debug: true
 model:
   train: true
-  epochs: 5
+  epochs: 1000
   train_test_ratio: 0.7
   train_single_sample: false
   save_file: saved_weights.pt
@@ -15,13 +15,25 @@ model:
   drop_edges: 0.5
   use_metadata: false
   batch_size: 8
+  seed:
+    - 2729424255
+    - 3683917037
+    - 2667104789
+    - 2821685283
+    - 4015210798
+  test_seed:
+    - 2400659785
+    - 1868133369
+    - 2767043706
+    - 1090722318
+    - 1872802580
 data:
   dir: Data/
   org_name: human
   random_edges: false
   n_random_edges_rna: 162
   n_random_edges_prot: 231
-  predefined_network: false
+  predefined_network: true
   use_ppi_network: true
   use_causal_edges: true
   significant_ppi: true
@@ -48,7 +60,7 @@ intervention:
   enabled: true
   sample: 1
   mult: 1.2
-  pathway: Central carbon metabolism in cancer
+  pathway: Non-alcoholic fatty liver disease
 output:
   save_dir: output/
 pathway_analysis:

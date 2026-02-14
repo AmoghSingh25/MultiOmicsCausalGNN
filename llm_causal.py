@@ -103,9 +103,7 @@ def process_cd_output(resp, labels):
 
 def process_orient_output(resp, edges):
     print("Orient Output - - - ")
-    print(edges)
     options = basic_output_process(resp)
-    print(options)
     valid_edges = []
     for i in range(len(options)):
         options[i] = int(options[i].strip())

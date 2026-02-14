@@ -1,3 +1,4 @@
+from typing import List
 import json
 import time
 import os
@@ -33,6 +34,11 @@ def _trainGNN(pyg, **kwargs):
     _timestamp = int(time.time())
     global_min_loss = sys.maxsize
     global_best_weight = None
+    pyg_rand = None
+
+    if type(pyg) is list:
+        pyg_rand = pyg
+        pyg = pyg_rand[0]
 
     if kwargs["config"]["model"]["use_metadata"]:
         metadata = torch.FloatTensor(metadata)
@@ -44,6 +50,9 @@ def _trainGNN(pyg, **kwargs):
     pyg["rna"].metadata = metadata
 
     for i in range(n_runs):
+        if type(pyg_rand) is List:
+            pyg = pyg_rand[i]
+
         kwargs["config"]["debug"] and print("\tRun No. = ", i + 1)
 
         seed_everything(kwargs["config"]["model"]["seed"][i])

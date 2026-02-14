@@ -210,6 +210,45 @@ def _intervention_analysis(
     rna_indices = set()
     rna_interest = set()
     rna_s = {rna_l[x]: x for x in range(len(rna_l))}
+    ## Down syndrome only RNAs
+    
+#     interest_rnas = [
+#     "TNF",
+#     "TRPV1",
+#     "IL12B",
+#     "IL13",
+#     "AHR",
+#     "IL10",
+#     "TRPA1",
+#     "NR4A2",
+#     "CXCL8",
+#     "IFNG",
+#     "IL5",
+#     "GSTM1",
+#     "SOD2",
+#     "CAT",
+#     "CRP",
+#     "IL4",
+#     "IL6",
+#     "IL1B",
+#     "IL2",
+#     "IL17A",
+#     "GPX1",
+#     "INS",
+#     "LEP",
+#     "LTA",
+#     "MPO",
+#     "NFKB1",
+#     "SLC6A4",
+#     "PLAT",
+#     "MIF",
+#     "MMP3",
+# ]
+#     for i in tqdm(interest_rnas):
+#         if i in rna_s:
+#             rna_indices.add(rna_s[i])
+#     print("Number of Interest indices - ", len(rna_indices))
+    
     for i in tqdm(prot_interest):
         prot_i_edges = list(g.edges(i))
         for e in prot_i_edges:

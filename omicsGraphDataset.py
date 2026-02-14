@@ -1,4 +1,3 @@
-import copy
 import torch
 from torch_geometric.data import Dataset, HeteroData
 from torch_geometric.utils import dropout_edge

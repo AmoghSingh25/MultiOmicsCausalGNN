@@ -14,25 +14,30 @@ def _():
     import os
     import json
     import numpy as np
-
     return json, np, os
 
 
 @app.cell
-def _(os):
-    logs_files = [x for x in os.listdir("output/logs/") if x.endswith(".json")]
+def _():
+    base_dir = "output/logs_analyse/"
+    return (base_dir,)
+
+
+@app.cell
+def _(base_dir, os):
+    logs_files = [x for x in os.listdir(base_dir) if x.endswith(".json")]
     logs_files.sort()
     logs_files
     return (logs_files,)
 
 
 @app.cell
-def _(json, logs_files):
+def _(base_dir, json, logs_files):
     file_run_mapping = {}
     for i in logs_files:
         timestamp = i[: i.index("_")]
         print(i)
-        with open("output/logs/" + i) as f:
+        with open(base_dir + i) as f:
             json_i = json.load(f)
         name_i = json_i["name"]
         print(name_i)
@@ -60,7 +65,7 @@ def _(file_run_mapping):
 
 @app.cell
 def _(working_timestamps):
-    working_timestamps
+    working_timestamps[-10:]
     return
 
 
@@ -71,12 +76,11 @@ def _(np):
             return np.min(arr), np.mean(arr)
 
         print(stat_loss(inp["loss_val"]["prot"]))
-
     return
 
 
 @app.cell
-def _(file_run_mapping, json, np, working_timestamps):
+def _(base_dir, file_run_mapping, json, np, working_timestamps):
     for _i in working_timestamps:
         prot_train_losses = []
         prot_test_losses = []
@@ -88,7 +92,7 @@ def _(file_run_mapping, json, np, working_timestamps):
 
         for _j in range(5):
             _file_path = _i + "_run_" + str(_j) + ".json"
-            with open("output/logs/" + _file_path) as _f:
+            with open(base_dir + _file_path) as _f:
                 _json_i = json.load(_f)
             # process_json_loss(_json_i)
             prot_train_losses.append(min(_json_i["loss_train"]["prot"]))

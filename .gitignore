@@ -11,3 +11,7 @@ multirun/
 Data/input_data
 Data/
 moca_env/
+TCGA_LUAD/
+TCGA_LUAD_MLP/
+wandb/
+lightning_logs/

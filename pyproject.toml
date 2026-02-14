@@ -15,6 +15,7 @@ dependencies = [
     "langchain-openai>=1.0.2",
     "langchain-text-splitters>=1.0.0",
     "langgraph>=1.0.3",
+    "lightning>=2.6.1",
     "lmstudio>=1.5.0",
     "lxml>=6.0.2",
     "marimo==0.18.0",
@@ -29,5 +30,6 @@ dependencies = [
     "torch",
     "torch-geometric>=2.7.0",
     "tqdm>=4.67.1",
+    "wandb>=0.25.0",
     "wikipedia>=1.4.0",
 ]

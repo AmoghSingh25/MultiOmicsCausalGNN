@@ -7,65 +7,62 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import polars as pl
+    import os
     import pickle
-    return pickle, pl
+    return os, pickle, pl
 
 
 @app.cell
-def _(pl):
-    _file_paths = [
-        "Data/input_data/KidneyTumorData/transcriptomics.csv",
-        "Data/input_data/KidneyTumorData/metabolomics.csv",
-        "Data/input_data/KidneyTumorData/proteomics.csv",
-    ]
+def _():
+    base_dir = "TCGA_LUAD/Data/"
+    return (base_dir,)
+
+
+@app.cell
+def _(base_dir, os, pl):
     _file_names = [
-        "transcriptomics.csv",
-        "metabolomics.csv",
-        "proteomics.csv",
+        "RNASeq",
+        "Methylation",
+        "miRNA",
     ]
+    label_file = pl.read_csv(
+        os.path.join(base_dir, "luad_subtypes.tsv"), separator="\t"
+    )
     _dfs = []
     frmt_dfs = []
     _ids = []
-    _start_ids = [1, 2, 5]
-    _id_cols = [0, 1, 2]
+    _start_ids = [1, 1, 1]
+    _id_cols = [0, 0, 0]
 
-    for _i in range(len(_file_paths)):
+    for _i in range(len(_file_names)):
         _dfs.append(
-            pl.read_csv(_file_paths[_i], infer_schema_length=0, null_values=["NA"])
+            pl.read_excel(
+                os.path.join(base_dir, _file_names[_i] + ".xlsx"),
+                infer_schema_length=0,
+            )
         )
         _ids.append(_dfs[-1].columns[_start_ids[_i] :])
 
     common_ids = set(_ids[0])
     common_ids.intersection_update(*_ids)
+    _label_ids = [x.replace("-", ".")[:-3] for x in label_file["sample"]]
+    common_ids.intersection_update(_label_ids)
     common_ids = list(common_ids)
     common_ids.sort()
 
-    for _i in range(len(_file_paths)):
-        _sel_cols = _dfs[_i].columns[: _start_ids[_i]]
+    for _i in range(len(_file_names)):
+        _sel_cols = [_dfs[_i].columns[_id_cols[_i]]]
         _sel_cols.extend(common_ids)
-        _df_i = _dfs[_i].select(_sel_cols)
-        frmt_dfs.append(_df_i)
-
-    _names = []
-    for _i in range(len(_file_paths)):
-        _names.append(frmt_dfs[_i].columns[_start_ids[_i] :])
-
-    for _i in range(0, len(frmt_dfs)):
-        if _i != 3:
-            print(_file_names[_i])
-            _sel_ids = [frmt_dfs[_i].columns[_id_cols[_i]]]
-            _sel_ids.extend(frmt_dfs[_i].columns[_start_ids[_i] :])
-            frmt_dfs[_i] = frmt_dfs[_i].drop_nulls(
-                subset=frmt_dfs[_i].columns[_id_cols[_i]]
-            )
-            frmt_dfs[_i] = frmt_dfs[_i].select(_sel_ids).transpose()
-            frmt_dfs[_i].columns = frmt_dfs[_i].row(0)
-            _cols = frmt_dfs[_i].row(0)
-            frmt_dfs[_i] = frmt_dfs[_i].slice(1)
-        frmt_dfs[_i].write_csv(
-            "Data/input_data/KidneyTumorData/frmt_" + _file_names[_i]
+        _frmt_df_i = _dfs[_i][_sel_cols]
+        _frmt_df_i.write_csv(
+            os.path.join(base_dir, "frmt_" + _file_names[_i] + ".csv")
         )
     return (common_ids,)
+
+
+@app.cell
+def _():
+    return
 
 
 @app.cell
