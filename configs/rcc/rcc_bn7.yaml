@@ -5,7 +5,7 @@ defaults:
 name: rcc_bn7
 description: Causal links with Significant PPI links
 model:
-  use_metadata: false
+  use_metadata: true
   train_single_sample: true
   batch_size: 8
 data:
@@ -13,6 +13,7 @@ data:
   use_causal_edges: true
   significant_ppi: true
   use_ppi_network: true
+  metadata_file: Data/input_data/KidneyTumorData/frmt_metadata.pkl
 causal:
   llm:
     objective: orient

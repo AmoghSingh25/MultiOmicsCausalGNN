@@ -5,7 +5,7 @@ defaults:
 name: rcc_bn8
 description: Causal links by Llama
 model:
-  use_metadata: false
+  use_metadata: true
   train_single_sample: true
   batch_size: 8
 data:
@@ -13,6 +13,7 @@ data:
   use_causal_edges: true
   significant_ppi: false
   use_ppi_network: false
+  metadata_file: Data/input_data/KidneyTumorData/frmt_metadata.pkl
 causal:
   filt_rna: Data/input_data/KidneyTumorData/transcriptomics_filt_edges.txt
   filt_prot: Data/input_data/KidneyTumorData/proteomics_filt_edges.txt

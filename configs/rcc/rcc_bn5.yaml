@@ -5,7 +5,7 @@ defaults:
 name: rcc_bn5
 description: Random links
 model:
-  use_metadata: false
+  use_metadata: true
   train_single_sample: true
   batch_size: 8
 data:
@@ -16,6 +16,7 @@ data:
   random_edges: true
   n_random_edges_rna: 162
   n_random_edges_prot: 231
+  metadata_file: Data/input_data/KidneyTumorData/frmt_metadata.pkl
 pathway_analysis:
   enabled: false
 intervention:
