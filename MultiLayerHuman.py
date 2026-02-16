@@ -3,19 +3,33 @@ import torch
 
 
 class MultiLayerHuman(torch.nn.Module):
-    def __init__(self, inp_dim, use_metadata=False, n_metadata=None):
+    def __init__(self, rna_dim, prot_dim, metab_dim, use_metadata=False, n_metadata=None):
         super().__init__()
         self.lin1 = HeteroDictLinear(
-            in_channels=inp_dim, out_channels=64, types=["rna", "protein", "metabolite"]
+            in_channels={
+                "rna":rna_dim,
+                "protein":prot_dim,
+                "metabolite": metab_dim
+            }, out_channels=64
         )
         self.lin2 = HeteroDictLinear(
             in_channels=128, out_channels=128, types=["rna", "protein", "metabolite"]
         )
 
-        self.lin3 = HeteroDictLinear(
+        self.rna_lin3 = HeteroDictLinear(
             in_channels=128,
-            out_channels=inp_dim,
-            types=["rna", "protein", "metabolite"],
+            out_channels=rna_dim,
+            types=["rna"],
+        )
+        self.prot_lin3 = HeteroDictLinear(
+            in_channels=128,
+            out_channels=prot_dim,
+            types=["protein"],
+        )
+        self.metab_lin3 = HeteroDictLinear(
+            in_channels=128,
+            out_channels=metab_dim,
+            types=["metabolite"],
         )
 
         self.use_metadata = use_metadata
@@ -96,15 +110,22 @@ class MultiLayerHuman(torch.nn.Module):
         # x_dict = {k: self.norm4(v).relu() for k, v in x_dict.items()}
 
         if self.use_metadata:
+            meta = self.metadata_lin(metadata)
             x_dict = {
-                k: v + res1[k] + self.metadata_lin(metadata.reshape(1, -1))
+                k: v + res1[k] + meta
                 for k, v in x_dict.items()
             }
         else:
             x_dict = {k: v + res1[k] for k, v in x_dict.items()}
 
         x_dict = {k: self.drop3(v) for k, v in x_dict.items()}
-        x_dict = self.lin3(x_dict)
+        out_dict = {}
+
+        out_dict.update(self.rna_lin3(x_dict))
+        out_dict.update(self.prot_lin3(x_dict))
+        out_dict.update(self.metab_lin3(x_dict))
+
+        x_dict = out_dict
         # x_dict = {k: F.softplus(v) for k, v in x_dict.items()}
 
         return x_dict

@@ -75,8 +75,11 @@ def _trainGNN(pyg, **kwargs):
             test_dataset, batch_size=kwargs["config"]["model"]["batch_size"]
         )
 
+        print("INPUT - - ", pyg)
         model = MultiLayerHuman(
-            inp_dim=1,
+            rna_dim=pyg['rna'].x.shape[0],
+            prot_dim=pyg['protein'].x.shape[0],
+            metab_dim=pyg['metabolite'].x.shape[0],
             use_metadata=kwargs["config"]["model"]["use_metadata"],
             n_metadata=metadata.shape[0],
         ).to(device)
@@ -114,7 +117,6 @@ def _trainGNN(pyg, **kwargs):
             for sample_x in train_loader:
                 sample_x = sample_x.to(device)
                 optim.zero_grad()
-
                 out = model(
                     sample_x.x_dict, sample_x.edge_index_dict, sample_x["rna"].metadata
                 )

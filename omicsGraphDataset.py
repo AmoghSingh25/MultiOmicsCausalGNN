@@ -70,24 +70,26 @@ class OmicGraphDataset(Dataset):
     def gen_graph(self, idx):
         pyg = HeteroData()
 
-        pyg["rna"].x = self.rna_x[:, idx].reshape(-1, 1)
-        pyg["protein"].x = torch.randn(self.protein_x.shape[0], 1)
-        pyg["metabolite"].x = torch.randn(self.metab_x.shape[0], 1)
-        pyg["rna"].metadata = self.metadata[:, idx]
+        pyg["rna"].x = self.rna_x[:, idx].reshape(1, -1)
+        pyg["protein"].x = torch.randn(1, self.protein_x.shape[0])
+        pyg["metabolite"].x = torch.randn(1, self.metab_x.shape[0])
+        pyg["rna"].metadata = self.metadata[:, idx].reshape(1,-1)
 
-        pyg["rna"].y = self.rna_x[:, idx].reshape(-1, 1)
+        pyg["rna"].y = self.rna_x[:, idx].reshape(1,-1)
+
         pyg["protein"].y = torch.nn.functional.normalize(
             torch.tensor(
                 self.protein_x[:, idx].T, dtype=torch.float32, device=self.device
-            ).reshape(-1, 1),
+            ).reshape(1, -1),
             dim=0,
         ).to(self.device)
         pyg["metabolite"].y = torch.nn.functional.normalize(
             torch.tensor(
                 self.metab_x[:, idx].T, dtype=torch.float32, device=self.device
-            ).reshape(-1, 1),
+            ).reshape(1, -1),
             dim=0,
         ).to(self.device)
+
         if torch.isnan(pyg["protein"].y).any():
             pyg["protein"].y = torch.nan_to_num(pyg["protein"].y, nan=0.0)
         if torch.isnan(pyg["metabolite"].y).any():

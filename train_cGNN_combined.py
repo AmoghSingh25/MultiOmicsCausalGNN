@@ -86,7 +86,6 @@ def _trainGNN(inp_pyg, **kwargs):
 
     for i in range(n_runs):
         if type(inp_pyg) is list:
-            print("Multiple Graphs..")
             pyg = inp_pyg[i]
         else:
             pyg = inp_pyg
