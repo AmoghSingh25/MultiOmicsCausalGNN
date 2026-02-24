@@ -77,9 +77,9 @@ def _trainGNN(pyg, **kwargs):
 
         print("INPUT - - ", pyg)
         model = MultiLayerHuman(
-            rna_dim=pyg['rna'].x.shape[0],
-            prot_dim=pyg['protein'].x.shape[0],
-            metab_dim=pyg['metabolite'].x.shape[0],
+            rna_dim=pyg["rna"].x.shape[0],
+            prot_dim=pyg["protein"].x.shape[0],
+            metab_dim=pyg["metabolite"].x.shape[0],
             use_metadata=kwargs["config"]["model"]["use_metadata"],
             n_metadata=metadata.shape[0],
         ).to(device)

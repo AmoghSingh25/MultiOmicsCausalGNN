@@ -9,6 +9,7 @@ def _():
     import polars as pl
     import os
     import pickle
+
     return os, pickle, pl
 
 
@@ -54,9 +55,7 @@ def _(base_dir, os, pl):
         _sel_cols = [_dfs[_i].columns[_id_cols[_i]]]
         _sel_cols.extend(common_ids)
         _frmt_df_i = _dfs[_i][_sel_cols]
-        _frmt_df_i.write_csv(
-            os.path.join(base_dir, "frmt_" + _file_names[_i] + ".csv")
-        )
+        _frmt_df_i.write_csv(os.path.join(base_dir, "frmt_" + _file_names[_i] + ".csv"))
     return (common_ids,)
 
 

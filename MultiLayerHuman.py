@@ -3,14 +3,13 @@ import torch
 
 
 class MultiLayerHuman(torch.nn.Module):
-    def __init__(self, rna_dim, prot_dim, metab_dim, use_metadata=False, n_metadata=None):
+    def __init__(
+        self, rna_dim, prot_dim, metab_dim, use_metadata=False, n_metadata=None
+    ):
         super().__init__()
         self.lin1 = HeteroDictLinear(
-            in_channels={
-                "rna":rna_dim,
-                "protein":prot_dim,
-                "metabolite": metab_dim
-            }, out_channels=64
+            in_channels={"rna": rna_dim, "protein": prot_dim, "metabolite": metab_dim},
+            out_channels=64,
         )
         self.lin2 = HeteroDictLinear(
             in_channels=128, out_channels=128, types=["rna", "protein", "metabolite"]
@@ -111,10 +110,7 @@ class MultiLayerHuman(torch.nn.Module):
 
         if self.use_metadata:
             meta = self.metadata_lin(metadata)
-            x_dict = {
-                k: v + res1[k] + meta
-                for k, v in x_dict.items()
-            }
+            x_dict = {k: v + res1[k] + meta for k, v in x_dict.items()}
         else:
             x_dict = {k: v + res1[k] for k, v in x_dict.items()}
 

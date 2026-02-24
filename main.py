@@ -75,12 +75,14 @@ def main(cfg: DictConfig):
     )
 
     cfg.debug and print("\tCreating graph...")
-    if torch.cuda.is_available():
+    if cfg.model.get("device") == "cuda" and torch.cuda.is_available():
         torch_device = torch.device("cuda")
-    elif torch.mps.is_available():
+    elif cfg.model.get("device") == "mps" and torch.mps.is_available():
         torch_device = torch.device("mps")
-    else:
+    elif cfg.model.get("device") == "cpu":
         torch_device = torch.device("cpu")
+    else:
+        raise ValueError("Invalid torch device")
 
     if cfg.data.random_edges:
         print("Generating multiple graphs..")

@@ -24,6 +24,7 @@ def _():
     from sklearn.metrics import accuracy_score
     from lightning.pytorch.loggers import WandbLogger
     from lightning.pytorch import Trainer
+
     return (
         AUROC,
         Accuracy,
@@ -47,12 +48,9 @@ def _(pl, torch):
     def frmt_id(x):
         return x.replace("-", ".")[:-3]
 
-
     rna_data = pl.read_csv("TCGA_LUAD/Data/frmt_RNASeq.csv")
     mirna_data = pl.read_csv("TCGA_LUAD/Data/frmt_miRNA.csv")
-    meth_data = pl.read_csv(
-        "TCGA_LUAD/Data/frmt_Methylation.csv", null_values=["NA"]
-    )
+    meth_data = pl.read_csv("TCGA_LUAD/Data/frmt_Methylation.csv", null_values=["NA"])
     labels = pl.read_csv("TCGA_LUAD/Data/luad_subtypes.tsv", separator="\t")
 
     sample_ids, y = (
@@ -84,14 +82,12 @@ def _(pl, torch):
     for _i in interest_cols[1:]:
         y_labels.append(label_dict[_i])
 
-
     def z_score_norm(inp, axis=0):
         mean = torch.mean(inp, axis=axis)
         std = torch.std(inp, axis=axis)
 
         inp = (inp - mean) / std
         return inp
-
 
     methy_ids = meth_data["attrib_name"].to_list()
     rna_ids = rna_data["attrib_name"].to_list()
@@ -135,6 +131,7 @@ def _(Dropout, F, Linear, torch):
             # x = F.relu(x)
             x = self.lin3(x)
             return x
+
     return (Model,)
 
 
@@ -186,6 +183,7 @@ def _(AUROC, Accuracy, L, torch):
                 "optimizer": self.optimizer,
                 "lr_scheduler": {"scheduler": self.scheduler, "monitor": monitor},
             }
+
     return (LitMLP,)
 
 

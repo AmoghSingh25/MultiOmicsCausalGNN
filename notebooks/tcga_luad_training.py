@@ -26,6 +26,7 @@ def _():
     PROJECT_ROOT = Path.cwd()  # or Path(__file__).resolve().parent
     sys.path.insert(0, str(PROJECT_ROOT))
     from TCGA_LUAD.graphDataset import OmicGraphDataset
+
     return (
         DataLoader,
         EdgeIndex,
@@ -61,9 +62,7 @@ def _(torch):
 def _(device, pl, torch):
     rna_data = pl.read_csv("TCGA_LUAD/Data/frmt_RNASeq.csv")
     mirna_data = pl.read_csv("TCGA_LUAD/Data/frmt_miRNA.csv")
-    meth_data = pl.read_csv(
-        "TCGA_LUAD/Data/frmt_Methylation.csv", null_values=["NA"]
-    )
+    meth_data = pl.read_csv("TCGA_LUAD/Data/frmt_Methylation.csv", null_values=["NA"])
     labels = pl.read_csv("TCGA_LUAD/Data/luad_subtypes.tsv", separator="\t")
 
     sample_ids, y = (
@@ -106,6 +105,7 @@ def _(torch):
 
         inp = (inp - mean) / std
         return inp
+
     return (z_score_norm,)
 
 
@@ -229,15 +229,11 @@ def _(HeteroConv, HeteroDictLinear, Linear, LinearNN, SAGEConv, torch):
 
         def forward(self, data, edge_dict, metadata=None):
             x_dict = self.lin1(data)
-            x_dict = {
-                k: self.drop1(self.norm1(v.relu())) for k, v in x_dict.items()
-            }
+            x_dict = {k: self.drop1(self.norm1(v.relu())) for k, v in x_dict.items()}
 
             x_dict = self.conv1(x_dict, edge_dict)
             res1 = self.lin2(x_dict)
-            x_dict = {
-                k: self.drop2(self.norm2(v).relu()) for k, v in x_dict.items()
-            }
+            x_dict = {k: self.drop2(self.norm2(v).relu()) for k, v in x_dict.items()}
 
             if self.use_metadata:
                 x_dict = {
@@ -255,6 +251,7 @@ def _(HeteroConv, HeteroDictLinear, Linear, LinearNN, SAGEConv, torch):
             # x_dict = {k: F.softplus(v) for k, v in x_dict.items()}
 
             return x_dict, logits
+
     return (MultiLayerHuman,)
 
 

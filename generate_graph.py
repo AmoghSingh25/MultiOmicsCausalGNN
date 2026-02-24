@@ -57,7 +57,7 @@ def check_repeat_element_edges(arr):
 
 def generate_random_edges(vals, req_shape, seed=None):
     np.random.seed(seed)
-    random_edges = np.random.choice(list(range(len(vals)-1)), size=req_shape)
+    random_edges = np.random.choice(list(range(len(vals) - 1)), size=req_shape)
     dup_edges = check_repeat_element_edges(random_edges)
     while len(dup_edges) > 0:
         random_edges = np.delete(random_edges, dup_edges, axis=0)
