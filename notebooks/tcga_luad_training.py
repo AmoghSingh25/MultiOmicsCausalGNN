@@ -19,6 +19,7 @@ def _():
     from torch.nn import Linear as LinearNN
     from sklearn.metrics import accuracy_score
     import pickle
+    import torch.nn.functional as F
 
     import sys
     from pathlib import Path
@@ -26,10 +27,10 @@ def _():
     PROJECT_ROOT = Path.cwd()  # or Path(__file__).resolve().parent
     sys.path.insert(0, str(PROJECT_ROOT))
     from TCGA_LUAD.graphDataset import OmicGraphDataset
-
     return (
         DataLoader,
         EdgeIndex,
+        F,
         HeteroConv,
         HeteroData,
         HeteroDictLinear,
@@ -105,7 +106,6 @@ def _(torch):
 
         inp = (inp - mean) / std
         return inp
-
     return (z_score_norm,)
 
 
@@ -162,7 +162,7 @@ def _(meth_rna_links, np, rna_miRNA_links, torch):
 
 
 @app.cell
-def _(HeteroConv, HeteroDictLinear, Linear, LinearNN, SAGEConv, torch):
+def _(F, HeteroConv, HeteroDictLinear, Linear, LinearNN, SAGEConv, torch):
     class MultiLayerHuman(torch.nn.Module):
         def __init__(self, inp_dim, num_mirna, use_metadata=False, n_metadata=None):
             super().__init__()
@@ -248,10 +248,9 @@ def _(HeteroConv, HeteroDictLinear, Linear, LinearNN, SAGEConv, torch):
 
             mirna_features = x_dict["mirna"].T
             logits = self.lin4(mirna_features)
-            # x_dict = {k: F.softplus(v) for k, v in x_dict.items()}
+            x_dict = {k: F.softplus(v) for k, v in x_dict.items()}
 
             return x_dict, logits
-
     return (MultiLayerHuman,)
 
 
@@ -307,14 +306,32 @@ def _(
     pyg["rna"].train_mask = train_mask
     pyg["rna"].test_mask = test_mask
 
-    pyg["methy"].test_mask = train_mask
+    pyg["methy"].train_mask = train_mask
     pyg["methy"].test_mask = test_mask
 
-    pyg["mirna"].test_mask = train_mask
+    pyg["mirna"].train_mask = train_mask
     pyg["mirna"].test_mask = test_mask
 
     pyg = pyg.to(device)
-    return pyg, test_mask
+    return pyg, test_mask, train_mask
+
+
+@app.cell
+def _(pyg):
+    pyg['mirna'].y
+    return
+
+
+@app.cell
+def _(train_mask):
+    train_mask.shape
+    return
+
+
+@app.cell
+def _(test_mask):
+    test_mask.shape
+    return
 
 
 @app.cell
@@ -328,7 +345,7 @@ def _(DataLoader, OmicGraphDataset, device, pyg):
 
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=1)
     test_loader = DataLoader(test_dataset, batch_size=1)
-    return (train_loader,)
+    return test_loader, train_loader
 
 
 @app.cell
@@ -341,23 +358,37 @@ def _(MultiLayerHuman, device, pyg, torch):
 
     optim = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optim, mode="min", factor=0.1, patience=20, min_lr=1e-10
+        optim, mode="min", factor=0.1, patience=20, min_lr=1e-8
     )
     loss_fn = torch.nn.CrossEntropyLoss()
     return loss_fn, model, optim, scheduler
 
 
 @app.cell
-def _(device, loss_fn, model, optim, scheduler, tqdm, train_loader):
+def _(
+    device,
+    loss_fn,
+    model,
+    optim,
+    scheduler,
+    test_loader,
+    torch,
+    tqdm,
+    train_loader,
+):
     lrs = []
     losses = []
     losses_val = []
-    prog_bar = tqdm(range(10))
+    max_epochs = 100
+
+    prog_bar = tqdm(range(max_epochs))
     best_model_weights = None
+    out_val = None
     for epoch in prog_bar:
+        model.train()
+        train_loss = 0.0
         for sample_x in train_loader:
             sample_x.to(device)
-            model.train()
             optim.zero_grad()
             out = model(sample_x.x_dict, sample_x.edge_index_dict)
 
@@ -365,27 +396,29 @@ def _(device, loss_fn, model, optim, scheduler, tqdm, train_loader):
 
             loss1.backward()
             optim.step()
+            train_loss += loss1.item()
 
-            model.eval()
-            # with torch.no_grad():
-            #     out_val = model(sample_x.x_dict, sample_x.edge_index_dict)
-            #     # out_val = normalize_output(out_val)
+        train_loss /= len(train_loader)
 
-            #     loss1_val = loss_fn(out_val[1][test_mask], y_labels[test_mask])
-            # prog_bar.set_description(f"Val Loss:{loss1_val}")
-            scheduler.step(loss1)
-            # losses_val.append(loss1_val.item())
-            losses.append(loss1.detach().item())
-            lrs.append(scheduler.get_last_lr())
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for sample_val in test_loader:
+                sample_val.to(device)
+                out_val = model(sample_val.x_dict, sample_val.edge_index_dict)
+                loss1_val = loss_fn(out_val[1], sample_val['mirna'].y[0])
+                val_loss += loss1_val.item()
+        val_loss /= len(test_loader)
 
-            # if loss1_val == min(losses_val):
-            #     best_model_weights = model.state_dict()
-    return best_model_weights, losses, losses_val, lrs
+        prog_bar.set_description(f"Val Loss:{val_loss:.4f}")
+        scheduler.step(val_loss)
+        losses_val.append(val_loss)
+        losses.append(train_loss)
+        lrs.append(scheduler.get_last_lr())
 
-
-@app.cell
-def _():
-    return
+        if val_loss == min(losses_val):
+            best_model_weights = model.state_dict()
+    return best_model_weights, losses, losses_val, lrs, out_val
 
 
 @app.cell
@@ -419,10 +452,28 @@ def _(lrs):
 
 
 @app.cell
-def _(accuracy_score, out_val, test_mask, torch, y_labels):
-    _ypred = torch.argmax(out_val[1], axis=1)[test_mask].cpu()
-    _ytrue = y_labels[test_mask].cpu()
-    accuracy_score(_ypred, _ytrue)
+def _(out_val):
+    out_val[1]
+    return
+
+
+@app.cell
+def _(accuracy_score, device, model, test_loader, torch):
+    _ytrue = []
+    _preds = []
+    for _sample_val in test_loader:
+        _sample_val.to(device)
+        _out_val = model(_sample_val.x_dict, _sample_val.edge_index_dict)
+        _preds.append(_out_val[1][0].detach().cpu())
+        _ytrue.append(_sample_val['mirna'].y.item())
+
+    _preds = torch.stack(_preds)
+    _ypred = torch.argmax(_preds, dim=1).numpy()
+
+    acc = accuracy_score(_ytrue, _ypred)
+    print(_ypred)
+    print(_ytrue)
+    print("Accuracy:", acc)
     return
 
 
