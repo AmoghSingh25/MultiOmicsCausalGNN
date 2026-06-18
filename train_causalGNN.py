@@ -75,7 +75,6 @@ def _trainGNN(pyg, **kwargs):
             test_dataset, batch_size=kwargs["config"]["model"]["batch_size"]
         )
 
-        print("INPUT - - ", pyg)
         model = MultiLayerHuman(
             rna_dim=pyg["rna"].x.shape[0],
             prot_dim=pyg["protein"].x.shape[0],

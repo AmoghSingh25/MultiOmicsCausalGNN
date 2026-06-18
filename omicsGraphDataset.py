@@ -69,7 +69,7 @@ class OmicGraphDataset(Dataset):
 
     def gen_graph(self, idx):
         pyg = HeteroData()
-
+        print("RNA sample shape = ", self.rna_x[:, idx].shape)
         pyg["rna"].x = self.rna_x[:, idx].reshape(1, -1)
         pyg["protein"].x = torch.randn(1, self.protein_x.shape[0])
         pyg["metabolite"].x = torch.randn(1, self.metab_x.shape[0])

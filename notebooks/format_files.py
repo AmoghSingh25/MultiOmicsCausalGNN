@@ -8,7 +8,6 @@ app = marimo.App(width="medium")
 def _():
     import polars as pl
     import pickle
-
     return pickle, pl
 
 

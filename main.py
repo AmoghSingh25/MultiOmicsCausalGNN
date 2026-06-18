@@ -79,10 +79,8 @@ def main(cfg: DictConfig):
         torch_device = torch.device("cuda")
     elif cfg.model.get("device") == "mps" and torch.mps.is_available():
         torch_device = torch.device("mps")
-    elif cfg.model.get("device") == "cpu":
-        torch_device = torch.device("cpu")
     else:
-        raise ValueError("Invalid torch device")
+        torch_device = torch.device("cpu")
 
     if cfg.data.random_edges:
         print("Generating multiple graphs..")
